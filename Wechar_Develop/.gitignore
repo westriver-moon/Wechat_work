@@ -1,0 +1,15 @@
+# Python virtual environments
+**/.venv/
+**/venv/
+
+# Python cache and bytecode
+**/__pycache__/
+**/*.pyc
+
+# Environment files with secrets
+feature2-ai/backend/.env
+
+# OS/editor artifacts
+.DS_Store
+Thumbs.db
+.vscode/

@@ -165,7 +165,7 @@
         <input id="keywordInput" type="text" placeholder="输入地点关键词，例如：北京理工大学、中关村地铁站" />
         <button id="searchBtn" type="button">查询地点</button>
       </div>
-      <div class="hint">腾讯地图 Key 已配置，可直接测试地点查询。</div>
+      <div class="hint">请先填入腾讯地图 Key（__TENCENT_MAP_KEY__）后再测试地点查询。</div>
     </section>
 
     <div id="status" class="status"></div>
@@ -191,6 +191,7 @@
     const placePositionEl = document.getElementById('placePosition');
     const placeImageEl = document.getElementById('placeImage');
 
+    const MAP_KEY = '__TENCENT_MAP_KEY__';
     const initialCenter = new TMap.LatLng(39.9042, 116.4074);
     const map = new TMap.Map('map', {
       center: initialCenter,
@@ -212,7 +213,7 @@
       const callbackName = `handleSearchResult_${Date.now()}`;
       const script = document.createElement('script');
 
-      const url = `https://apis.map.qq.com/ws/place/v1/search?keyword=${encodeURIComponent(keyword)}&boundary=region(中国,0)&key=U2MBZ-DORWT-V2WXP-VKD4A-F2OEV-IJFUR&output=jsonp&callback=${callbackName}`;
+      const url = `https://apis.map.qq.com/ws/place/v1/search?keyword=${encodeURIComponent(keyword)}&boundary=region(中国,0)&key=${MAP_KEY}&output=jsonp&callback=${callbackName}`;
 
       window[callbackName] = function (res) {
         document.body.removeChild(script);
@@ -251,7 +252,7 @@
         placeAddressEl.textContent = place.address || '暂无详细地址';
         placePositionEl.textContent = `坐标：${lat.toFixed(6)}, ${lng.toFixed(6)}`;
 
-        placeImageEl.src = `https://apis.map.qq.com/ws/staticmap/v2/?center=${lat},${lng}&zoom=15&size=600*400&markers=size:large|color:0x0A7CFF|label:A|${lat},${lng}&key=U2MBZ-DORWT-V2WXP-VKD4A-F2OEV-IJFUR`;
+        placeImageEl.src = `https://apis.map.qq.com/ws/staticmap/v2/?center=${lat},${lng}&zoom=15&size=600*400&markers=size:large|color:0x0A7CFF|label:A|${lat},${lng}&key=${MAP_KEY}`;
 
         setStatus('查询成功，已更新地图与地点信息。');
       };
@@ -265,6 +266,10 @@
     }
 
     function triggerSearch() {
+      if (MAP_KEY.includes('__TENCENT_MAP_KEY__')) {
+        setStatus('请先在代码中替换 __TENCENT_MAP_KEY__ 为你的腾讯地图 Key。', true);
+        return;
+      }
       const keyword = inputEl.value.trim();
       if (!keyword) {
         setStatus('请先输入地点关键词。', true);
