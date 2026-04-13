@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>地点查询</title>
+  <script charset="utf-8" src="https://map.qq.com/api/gljs?v=1.exp&key=U2MBZ-DORWT-V2WXP-VKD4A-F2OEV-IJFUR"></script>
+  <style>
+    :root {
+      --bg-1: #f4f7fb;
+      --bg-2: #dbe9ff;
+      --card: #ffffff;
+      --text: #10233f;
+      --muted: #48617f;
+      --brand: #0a7cff;
+      --brand-2: #06b6d4;
+      --danger: #d93025;
+      --shadow: 0 12px 30px rgba(10, 30, 60, 0.12);
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 15% 10%, rgba(10, 124, 255, 0.2), transparent 35%),
+        radial-gradient(circle at 85% 20%, rgba(6, 182, 212, 0.2), transparent 35%),
+        linear-gradient(135deg, var(--bg-1), var(--bg-2));
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .app {
+      width: min(1100px, 100%);
+      display: grid;
+      gap: 14px;
+      grid-template-rows: auto auto 1fr;
+    }
+
+    .toolbar {
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(6px);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+    }
+
+    .search-box {
+      display: flex;
+      gap: 8px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      border: 1px solid #d6e0ef;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 16px;
+      outline: none;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(10, 124, 255, 0.15);
+    }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      color: #fff;
+      background: linear-gradient(120deg, var(--brand), var(--brand-2));
+      transition: transform 0.15s ease;
+    }
+
+    button:active { transform: scale(0.98); }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      align-self: center;
+    }
+
+    .status {
+      min-height: 20px;
+      color: var(--muted);
+      font-size: 14px;
+      padding: 0 2px;
+    }
+
+    .status.error { color: var(--danger); }
+
+    .content {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 14px;
+      min-height: 460px;
+    }
+
+    #map {
+      width: 100%;
+      min-height: 460px;
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      background: #e9f1ff;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px;
+      display: grid;
+      grid-template-rows: auto auto auto 1fr;
+      gap: 8px;
+    }
+
+    .card h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    .preview {
+      width: 100%;
+      height: 220px;
+      object-fit: cover;
+      border-radius: 12px;
+      background: #edf3ff;
+      border: 1px solid #e0e8f6;
+    }
+
+    @media (max-width: 900px) {
+      .content { grid-template-columns: 1fr; }
+      #map { min-height: 360px; }
+      .toolbar { grid-template-columns: 1fr; }
+      .search-box { flex-wrap: wrap; }
+      .search-box button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="toolbar">
+      <div class="search-box">
+        <input id="keywordInput" type="text" placeholder="输入地点关键词，例如：北京理工大学、中关村地铁站" />
+        <button id="searchBtn" type="button">查询地点</button>
+      </div>
+      <div class="hint">腾讯地图 Key 已配置，可直接测试地点查询。</div>
+    </section>
+
+    <div id="status" class="status"></div>
+
+    <section class="content">
+      <div id="map"></div>
+      <article class="card">
+        <h2 id="placeName">尚未查询</h2>
+        <p id="placeAddress" class="muted">输入地点后，将显示名称、地址和静态预览图。</p>
+        <p id="placePosition" class="muted">坐标：-</p>
+        <img id="placeImage" class="preview" alt="地点图片预览" />
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const inputEl = document.getElementById('keywordInput');
+    const searchBtn = document.getElementById('searchBtn');
+
+    const placeNameEl = document.getElementById('placeName');
+    const placeAddressEl = document.getElementById('placeAddress');
+    const placePositionEl = document.getElementById('placePosition');
+    const placeImageEl = document.getElementById('placeImage');
+
+    const initialCenter = new TMap.LatLng(39.9042, 116.4074);
+    const map = new TMap.Map('map', {
+      center: initialCenter,
+      zoom: 12,
+      viewMode: '2D'
+    });
+
+    let markerLayer = new TMap.MultiMarker({
+      map,
+      geometries: []
+    });
+
+    function setStatus(text, isError = false) {
+      statusEl.textContent = text;
+      statusEl.className = isError ? 'status error' : 'status';
+    }
+
+    function searchPlace(keyword) {
+      const callbackName = `handleSearchResult_${Date.now()}`;
+      const script = document.createElement('script');
+
+      const url = `https://apis.map.qq.com/ws/place/v1/search?keyword=${encodeURIComponent(keyword)}&boundary=region(中国,0)&key=U2MBZ-DORWT-V2WXP-VKD4A-F2OEV-IJFUR&output=jsonp&callback=${callbackName}`;
+
+      window[callbackName] = function (res) {
+        document.body.removeChild(script);
+        delete window[callbackName];
+
+        if (res.status !== 0) {
+          if (res.status === 121) {
+            setStatus('地图 Key 当日调用量已达上限，请次日重试或更换 Key。', true);
+          } else if (res.status === 311) {
+            setStatus('地图 Key 无效或服务未开通，请检查腾讯位置服务控制台配置。', true);
+          } else {
+            setStatus(`地图查询失败（状态码 ${res.status}）：${res.message || '未知错误'}`, true);
+          }
+          return;
+        }
+
+        if (!res.data || res.data.length === 0) {
+          setStatus('未找到匹配地点，请更换关键词。', true);
+          return;
+        }
+
+        const place = res.data[0];
+        const { lat, lng } = place.location;
+
+        map.setCenter(new TMap.LatLng(lat, lng));
+        map.setZoom(15);
+
+        markerLayer.setGeometries([
+          {
+            id: 'selected_place',
+            position: new TMap.LatLng(lat, lng)
+          }
+        ]);
+
+        placeNameEl.textContent = place.title || '未知地点';
+        placeAddressEl.textContent = place.address || '暂无详细地址';
+        placePositionEl.textContent = `坐标：${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
+        placeImageEl.src = `https://apis.map.qq.com/ws/staticmap/v2/?center=${lat},${lng}&zoom=15&size=600*400&markers=size:large|color:0x0A7CFF|label:A|${lat},${lng}&key=U2MBZ-DORWT-V2WXP-VKD4A-F2OEV-IJFUR`;
+
+        setStatus('查询成功，已更新地图与地点信息。');
+      };
+
+      script.onerror = function () {
+        setStatus('查询失败，请检查网络或 API Key。', true);
+      };
+
+      script.src = url;
+      document.body.appendChild(script);
+    }
+
+    function triggerSearch() {
+      const keyword = inputEl.value.trim();
+      if (!keyword) {
+        setStatus('请先输入地点关键词。', true);
+        return;
+      }
+      setStatus('正在查询，请稍候...');
+      searchPlace(keyword);
+    }
+
+    searchBtn.addEventListener('click', triggerSearch);
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        triggerSearch();
+      }
+    });
+
+    placeImageEl.src = 'https://via.placeholder.com/600x400?text=%E5%9C%B0%E7%82%B9%E5%9B%BE%E7%89%87%E9%A2%84%E8%A7%88';
+  </script>
+</body>
+</html>

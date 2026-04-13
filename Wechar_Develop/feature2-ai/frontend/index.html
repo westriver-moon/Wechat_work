@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>北理新生助手</title>
+  <style>
+    :root {
+      --bg-1: #f3f7ef;
+      --bg-2: #e5efe1;
+      --card: #fffdf8;
+      --ink: #1c2b22;
+      --muted: #5b6d62;
+      --brand: #2d6a4f;
+      --brand-2: #40916c;
+      --line: #d9e6dc;
+      --shadow: 0 14px 32px rgba(45, 106, 79, 0.16);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 8% 12%, rgba(64, 145, 108, 0.25), transparent 34%),
+        radial-gradient(circle at 92% 88%, rgba(82, 183, 136, 0.18), transparent 36%),
+        linear-gradient(155deg, var(--bg-1), var(--bg-2));
+      display: grid;
+      place-items: center;
+      padding: 18px;
+    }
+
+    .wrap {
+      width: min(980px, 100%);
+      display: grid;
+      gap: 14px;
+    }
+
+    .hero {
+      background: rgba(255, 253, 248, 0.88);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .hero p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 10px;
+      align-content: start;
+      transform: translateY(8px);
+      opacity: 0;
+      animation: rise 0.35s ease forwards;
+    }
+
+    .card:nth-child(2) { animation-delay: 0.08s; }
+
+    .card h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+      min-height: 50px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      border-radius: 12px;
+      text-decoration: none;
+      color: #fff;
+      font-weight: 700;
+      background: linear-gradient(120deg, var(--brand), var(--brand-2));
+    }
+
+    @keyframes rise {
+      from { transform: translateY(8px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    @media (max-width: 760px) {
+      .grid { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 21px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <h1>北理新生助手</h1>
+      <p>统一入口页面。可直接配置为公众号菜单地址，再由用户选择地点查询或智能问答。</p>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>地点查询</h2>
+        <p>输入地点关键词，查看地图定位、地址信息和静态地图预览。</p>
+        <a class="btn" href="/place">进入地点查询</a>
+      </article>
+
+      <article class="card">
+        <h2>智能问答</h2>
+        <p>针对新生常见问题进行问答，支持 FAQ 检索和可选大模型增强。</p>
+        <a class="btn" href="/chat">进入智能问答</a>
+      </article>
+    </section>
+  </main>
+</body>
+</html>
