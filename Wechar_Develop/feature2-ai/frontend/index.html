@@ -6,15 +6,15 @@
   <title>北理新生助手</title>
   <style>
     :root {
-      --bg-1: #f3f7ef;
-      --bg-2: #e5efe1;
-      --card: #fffdf8;
-      --ink: #1c2b22;
-      --muted: #5b6d62;
-      --brand: #2d6a4f;
-      --brand-2: #40916c;
-      --line: #d9e6dc;
-      --shadow: 0 14px 32px rgba(45, 106, 79, 0.16);
+      --bg-1: #f7fafc;
+      --bg-2: #e9f2ff;
+      --card: #ffffff;
+      --ink: #12253d;
+      --muted: #566f8e;
+      --brand: #0f5ccf;
+      --brand-2: #2785ff;
+      --line: #d7e4f6;
+      --shadow: 0 16px 36px rgba(15, 92, 207, 0.16);
       --radius: 18px;
     }
 
@@ -26,93 +26,118 @@
       font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
       color: var(--ink);
       background:
-        radial-gradient(circle at 8% 12%, rgba(64, 145, 108, 0.25), transparent 34%),
-        radial-gradient(circle at 92% 88%, rgba(82, 183, 136, 0.18), transparent 36%),
-        linear-gradient(155deg, var(--bg-1), var(--bg-2));
+        radial-gradient(circle at 12% 10%, rgba(46, 110, 255, 0.22), transparent 34%),
+        radial-gradient(circle at 86% 82%, rgba(54, 169, 255, 0.16), transparent 36%),
+        linear-gradient(160deg, var(--bg-1), var(--bg-2));
       display: grid;
       place-items: center;
-      padding: 18px;
+      padding: 20px;
     }
 
     .wrap {
       width: min(980px, 100%);
       display: grid;
-      gap: 14px;
+      gap: 18px;
     }
 
     .hero {
-      background: rgba(255, 253, 248, 0.88);
+      background: rgba(255, 255, 255, 0.9);
       border: 1px solid var(--line);
       border-radius: var(--radius);
-      padding: 16px;
+      padding: 22px;
       box-shadow: var(--shadow);
     }
 
     .hero h1 {
       margin: 0;
-      font-size: 24px;
+      font-size: 30px;
+      letter-spacing: 0.5px;
     }
 
     .hero p {
-      margin: 8px 0 0;
+      margin: 10px 0 0;
       color: var(--muted);
       line-height: 1.6;
+      font-size: 15px;
     }
 
     .grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px;
+      gap: 18px;
     }
 
     .card {
+      position: relative;
       background: var(--card);
       border: 1px solid var(--line);
       border-radius: var(--radius);
-      padding: 16px;
+      padding: 20px;
       box-shadow: var(--shadow);
       display: grid;
-      gap: 10px;
-      align-content: start;
-      transform: translateY(8px);
-      opacity: 0;
-      animation: rise 0.35s ease forwards;
+      gap: 12px;
+      overflow: hidden;
     }
 
-    .card:nth-child(2) { animation-delay: 0.08s; }
+    .card::after {
+      content: "";
+      position: absolute;
+      right: -60px;
+      top: -60px;
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(39, 133, 255, 0.25), rgba(39, 133, 255, 0));
+    }
+
+    .badge {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 800;
+      background: linear-gradient(120deg, var(--brand), var(--brand-2));
+      box-shadow: 0 8px 20px rgba(39, 133, 255, 0.28);
+    }
 
     .card h2 {
-      margin: 0;
-      font-size: 20px;
+      margin: 2px 0 0;
+      font-size: 24px;
     }
 
     .card p {
       margin: 0;
       color: var(--muted);
-      line-height: 1.6;
-      min-height: 50px;
+      line-height: 1.65;
+      min-height: 54px;
     }
 
-    .btn {
+    .action {
+      margin-top: 2px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 42px;
-      border-radius: 12px;
       text-decoration: none;
-      color: #fff;
+      border-radius: 12px;
+      min-height: 44px;
+      padding: 0 16px;
       font-weight: 700;
+      color: #fff;
       background: linear-gradient(120deg, var(--brand), var(--brand-2));
+      width: fit-content;
     }
 
-    @keyframes rise {
-      from { transform: translateY(8px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
+    .tip {
+      font-size: 13px;
+      color: var(--muted);
+      text-align: center;
     }
 
     @media (max-width: 760px) {
       .grid { grid-template-columns: 1fr; }
-      .hero h1 { font-size: 21px; }
+      .hero h1 { font-size: 24px; }
     }
   </style>
 </head>
@@ -120,22 +145,26 @@
   <main class="wrap">
     <section class="hero">
       <h1>北理新生助手</h1>
-      <p>统一入口页面。可直接配置为公众号菜单地址，再由用户选择地点查询或智能问答。</p>
+      <p>请选择需要使用的功能页面，支持地点查询与新生问答两个独立入口。</p>
     </section>
 
     <section class="grid">
       <article class="card">
+        <div class="badge">01</div>
         <h2>地点查询</h2>
-        <p>输入地点关键词，查看地图定位、地址信息和静态地图预览。</p>
-        <a class="btn" href="/place">进入地点查询</a>
+        <p>输入地点关键词，查看地图定位、地址信息与坐标。</p>
+        <a class="action" href="/place">进入地点查询</a>
       </article>
 
       <article class="card">
+        <div class="badge">02</div>
         <h2>智能问答</h2>
-        <p>针对新生常见问题进行问答，支持 FAQ 检索和可选大模型增强。</p>
-        <a class="btn" href="/chat">进入智能问答</a>
+        <p>围绕报到、选课、住宿、校园网等问题进行咨询。</p>
+        <a class="action" href="/chat">进入智能问答</a>
       </article>
     </section>
+
+    <div class="tip">建议将此页面配置为公众号菜单入口。</div>
   </main>
 </body>
 </html>

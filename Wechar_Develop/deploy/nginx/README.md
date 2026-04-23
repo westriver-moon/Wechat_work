@@ -66,3 +66,16 @@ gunicorn -w 2 -b 127.0.0.1:5000 app:app
 ## 7. 建议：把后端做成 systemd 服务
 
 推荐用 systemd 将 Gunicorn 注册为系统服务，避免手动启动。参考 `deploy/linux/systemd-service.md`。
+
+## 8. RAG 状态验证（建议）
+
+部署后执行：
+
+```bash
+curl -X POST 'https://你的域名/api/rebuild_index'
+curl 'https://你的域名/api/demo_status'
+```
+
+预期：
+- `kb_index_ready=true`
+- 当 `.env` 里 `KB_FORCE_LEXICAL=0` 且 HuggingFace 网络可达时，`kb_backend=faiss`

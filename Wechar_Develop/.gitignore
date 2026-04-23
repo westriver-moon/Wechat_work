@@ -9,6 +9,11 @@
 # Environment files with secrets
 feature2-ai/backend/.env
 
+# RAG index files
+feature2-ai/backend/kb_index.faiss
+feature2-ai/backend/kb_meta.json
+feature2-ai/backend/kb_texts.json
+
 # OS/editor artifacts
 .DS_Store
 Thumbs.db

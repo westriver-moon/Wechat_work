@@ -34,10 +34,15 @@ cat > /opt/Wechar_Develop/feature2-ai/backend/.env << 'EOF'
 FLASK_ENV=development
 PORT=5000
 WECHAT_TOKEN=replace_with_your_token
-OPENAI_BASE_URL=replace_with_your_base_url
-OPENAI_API_KEY=replace_with_your_api_key
-OPENAI_MODEL=replace_with_your_model
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_API_KEY=replace_with_your_api_key
+DEEPSEEK_MODEL=deepseek-chat
 OPENAI_TIMEOUT=15
+LLM_TEMPERATURE=0.2
+LLM_TOP_P=0.9
+LLM_MAX_TOKENS=400
+LLM_MIN_CONFIDENCE=0.60
+KB_FORCE_LEXICAL=0
 EOF
 
 # 4) 配置 systemd 服务
@@ -78,7 +83,8 @@ sudo systemctl restart nginx
   - `ssl_certificate_key` 改为真实私钥路径
 - `/opt/Wechar_Develop/feature2-ai/backend/.env` 中：
   - `WECHAT_TOKEN` 必须与公众号后台一致
-  - AI 相关变量不使用可留空
+  - `DEEPSEEK_API_KEY` 填真实值
+  - `KB_FORCE_LEXICAL=0` 为 HuggingFace + FAISS 模式；网络异常时改 `1` 回退词法模式
 
 ## 4. 上线验收命令
 
@@ -88,6 +94,8 @@ sudo systemctl status nginx --no-pager
 curl -I https://你的域名/
 curl -I https://你的域名/chat
 curl -I https://你的域名/place
+curl -X POST 'https://你的域名/api/rebuild_index'
+curl 'https://你的域名/api/demo_status'
 curl -X POST 'https://你的域名/api/chat' -H 'Content-Type: application/json' -d '{"question":"新生什么时候选课"}'
 ```
 
@@ -111,3 +119,4 @@ sudo systemctl restart nginx
 - 502 Bad Gateway：先看 `wechat-assistant` 是否启动成功
 - 微信校验失败：核对 `WECHAT_TOKEN` 与公众号后台一致
 - 地图查询失败：检查腾讯地图 Key 是否替换、域名白名单与配额
+- `kb_backend` 不是 `faiss`：检查 HuggingFace 网络连通、`.env` 是否为 `KB_FORCE_LEXICAL=0`

@@ -32,10 +32,11 @@ User=www-data
 Group=www-data
 WorkingDirectory=/opt/Wechar_Develop/feature2-ai/backend
 Environment="WECHAT_TOKEN=replace_with_your_token"
-Environment="OPENAI_BASE_URL=replace_with_your_base_url"
-Environment="OPENAI_API_KEY=replace_with_your_api_key"
-Environment="OPENAI_MODEL=replace_with_your_model"
+Environment="DEEPSEEK_BASE_URL=https://api.deepseek.com"
+Environment="DEEPSEEK_API_KEY=replace_with_your_api_key"
+Environment="DEEPSEEK_MODEL=deepseek-chat"
 Environment="OPENAI_TIMEOUT=15"
+Environment="KB_FORCE_LEXICAL=0"
 ExecStart=/opt/Wechar_Develop/feature2-ai/backend/.venv/bin/gunicorn -w 2 -b 127.0.0.1:5000 app:app
 Restart=always
 RestartSec=5
@@ -64,6 +65,17 @@ sudo journalctl -u wechat-assistant -f
 
 浏览器访问：
 
-- `https://你的域名/healthz`
+- `https://你的域名/`
 - `https://你的域名/chat`
 - `https://你的域名/place`
+
+接口验证：
+
+```bash
+curl -X POST 'https://你的域名/api/rebuild_index'
+curl 'https://你的域名/api/demo_status'
+```
+
+预期：
+- `kb_index_ready=true`
+- 当 `KB_FORCE_LEXICAL=0` 且网络正常时，`kb_backend=faiss`

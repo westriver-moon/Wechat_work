@@ -61,6 +61,24 @@
       font-size: 13px;
     }
 
+    .head-nav {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .head-link {
+      text-decoration: none;
+      font-size: 12px;
+      color: #0d3b2f;
+      background: #e8f4ef;
+      border: 1px solid #c6ddd4;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-weight: 700;
+    }
+
     .messages {
       padding: 14px;
       overflow: auto;
@@ -143,7 +161,11 @@
   <main class="chat">
     <header class="head">
       <h1>新生智能问答助手</h1>
-      <p>可用于选课、宿舍、校园网、食堂、图书馆等问题咨询</p>
+      <p>支持选课、宿舍、校园网、食堂、图书馆等问题咨询</p>
+      <div class="head-nav">
+        <a class="head-link" href="/">返回主页</a>
+        <a class="head-link" href="/place">进入地图查询</a>
+      </div>
     </header>
 
     <section id="messages" class="messages"></section>
@@ -203,7 +225,7 @@
       }
     });
 
-    addMessage('bot', '你好，我是新生助手。你可以问我选课、宿舍、校园网等问题。');
+    addMessage('bot', '你好，我是新生助手。你可以直接输入问题进行问答。');
   </script>
 </body>
 </html>
