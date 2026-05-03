@@ -179,14 +179,13 @@
   <main class="wrap">
     <section class="panel">
       <h1>学长处理台</h1>
-      <div class="muted">无登录 MVP：使用学长密钥调用待办与提交接口。上线前请替换为正式鉴权方案。</div>
+      <div class="muted">正式鉴权模式：仅拥有答复权限的已登录账号可以进入和操作。</div>
       <div class="row">
-        <input id="seniorName" type="text" placeholder="学长昵称（如 seniorA）" style="min-width: 180px;" />
-        <input id="seniorKey" type="password" placeholder="X-Senior-Key" style="min-width: 220px;" />
+        <span id="me" class="count">加载中</span>
         <input id="searchInput" type="text" placeholder="搜索编号/提问/回答/查询码" style="min-width: 220px;" />
-        <button id="saveKeyBtn" class="btn secondary" type="button">保存密钥</button>
         <button id="searchBtn" class="btn secondary" type="button">搜索</button>
         <button id="refreshBtn" class="btn" type="button">刷新待办</button>
+        <a class="btn secondary" href="/logout">退出登录</a>
         <a class="btn secondary" href="/">返回首页</a>
       </div>
       <div id="status" class="muted" style="margin-top: 8px;"></div>
@@ -203,7 +202,7 @@
 
       <section class="panel">
         <div class="sub">
-          <h3>已回答问题</h3>
+          <h3>已处理问题</h3>
           <span id="answeredCount" class="count">0</span>
         </div>
         <div id="answeredList" class="list"></div>
@@ -212,22 +211,12 @@
   </main>
 
   <script>
-    const keyStorage = 'feature3_senior_key';
-    const nameStorage = 'feature3_senior_name';
     let currentQuery = '';
 
     function esc(text) {
       return (text || '').replace(/[&<>"']/g, (s) => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
       }[s]));
-    }
-
-    function getSeniorKey() {
-      return (document.getElementById('seniorKey').value || '').trim();
-    }
-
-    function getSeniorName() {
-      return (document.getElementById('seniorName').value || 'senior').trim();
     }
 
     function getSearchQuery() {
@@ -252,7 +241,7 @@
             <div class="muted">${esc(item.channel || '-')} · 查询码 ${esc(item.view_code || '-')}</div>
           </div>
           <div>${esc(item.content || '')}</div>
-          <div class="note">来自: ${esc(item.from_user_identity || '-')} · 提交时间: ${esc(fmtTs(item.created_at))}</div>
+          <div class="note">来自: ${esc(item.from_user_display || '已认证用户')} · 提交时间: ${esc(fmtTs(item.created_at))}</div>
           <textarea placeholder="请输入你的人工回复" data-answer-for="${item.id}"></textarea>
           <div class="row">
             <button class="btn" data-submit-for="${item.id}" type="button">提交回复</button>
@@ -262,15 +251,16 @@
     }
 
     function answeredCard(item) {
+      const statusText = item.status === 'closed' ? '已关闭' : '已回答';
       return `
         <article class="item">
           <div class="head">
             <div class="qid">#${item.id} ${esc(item.title || '未命名问题')}</div>
-            <div class="muted">${esc(item.channel || '-')} · 查询码 ${esc(item.view_code || '-')}</div>
+            <div class="muted">${esc(statusText)} · ${esc(item.channel || '-')} · 查询码 ${esc(item.view_code || '-')}</div>
           </div>
           <div>${esc(item.content || '')}</div>
           <div class="answer">${esc(item.answer || '')}</div>
-          <div class="note">提问者: ${esc(item.from_user_identity || '-')} · 回答者: ${esc(item.answerer_nickname || item.answerer_identity || '-')} · 回答时间: ${esc(fmtTs(item.answered_at))}</div>
+          <div class="note">提问者: ${esc(item.from_user_display || '已认证用户')} · 回答者: ${esc(item.answerer_display || item.answerer_nickname || '-')} · 回答时间: ${esc(fmtTs(item.answered_at))}</div>
         </article>
       `;
     }
@@ -282,17 +272,10 @@
     async function loadPending() {
       const listEl = document.getElementById('pendingList');
       const countEl = document.getElementById('pendingCount');
-      const key = getSeniorKey();
-      if (!key) {
-        setStatus('请先输入学长密钥。');
-        return;
-      }
 
       listEl.innerHTML = '';
       try {
-        const res = await fetch(`/api/tasks/pending?q=${encodeURIComponent(currentQuery)}`, {
-          headers: { 'X-Senior-Key': key },
-        });
+        const res = await fetch(`/api/tasks/pending?q=${encodeURIComponent(currentQuery)}`);
         const data = await res.json();
         if (!res.ok) {
           setStatus(data.error || '加载失败');
@@ -316,16 +299,10 @@
     async function loadAnswered() {
       const listEl = document.getElementById('answeredList');
       const countEl = document.getElementById('answeredCount');
-      const key = getSeniorKey();
-      if (!key) {
-        return;
-      }
 
       listEl.innerHTML = '';
       try {
-        const res = await fetch(`/api/tasks/answered?q=${encodeURIComponent(currentQuery)}`, {
-          headers: { 'X-Senior-Key': key },
-        });
+        const res = await fetch(`/api/tasks/answered?q=${encodeURIComponent(currentQuery)}`);
         const data = await res.json();
         if (!res.ok) {
           countEl.textContent = '0';
@@ -345,26 +322,15 @@
     }
 
     async function loadAll() {
-      const key = getSeniorKey();
-      if (!key) {
-        setStatus('请先输入学长密钥。');
-        return;
-      }
       setStatus(`加载中...${currentQuery ? `（搜索: ${currentQuery}）` : ''}`);
       await Promise.all([loadPending(), loadAnswered()]);
       setStatus(`加载完成${currentQuery ? `，当前搜索：${currentQuery}` : ''}`);
     }
 
     async function submitAnswer(questionId) {
-      const key = getSeniorKey();
-      const seniorName = getSeniorName();
       const ta = document.querySelector(`textarea[data-answer-for="${questionId}"]`);
       const content = ta ? ta.value.trim() : '';
 
-      if (!key) {
-        setStatus('请先输入学长密钥。');
-        return;
-      }
       if (!content) {
         setStatus('请输入回复内容后再提交。');
         return;
@@ -376,8 +342,6 @@
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Senior-Key': key,
-            'X-Senior-Name': seniorName,
           },
           body: JSON.stringify({ question_id: Number(questionId), content }),
         });
@@ -394,21 +358,12 @@
       }
     }
 
-    function saveKey() {
-      const key = getSeniorKey();
-      const name = getSeniorName();
-      localStorage.setItem(keyStorage, key);
-      localStorage.setItem(nameStorage, name);
-      setStatus('密钥和昵称已保存到本地。');
-    }
-
     function doSearch() {
       currentQuery = getSearchQuery();
       loadAll();
     }
 
     function bindEvents() {
-      document.getElementById('saveKeyBtn').addEventListener('click', saveKey);
       document.getElementById('refreshBtn').addEventListener('click', () => {
         currentQuery = '';
         document.getElementById('searchInput').value = '';
@@ -430,10 +385,26 @@
       });
     }
 
+    async function loadMe() {
+      try {
+        const res = await fetch('/api/auth/me');
+        const data = await res.json();
+        if (!res.ok) {
+          document.getElementById('me').textContent = '未登录';
+          return;
+        }
+        const user = data.user || {};
+        const name = user.name || user.student_code || '已登录';
+        const labels = Array.isArray(user.permission_labels) ? user.permission_labels.join(', ') : '';
+        document.getElementById('me').textContent = labels ? `${name} · ${labels}` : name;
+      } catch (err) {
+        document.getElementById('me').textContent = '加载失败';
+      }
+    }
+
     (function init() {
-      document.getElementById('seniorKey').value = localStorage.getItem(keyStorage) || '';
-      document.getElementById('seniorName').value = localStorage.getItem(nameStorage) || 'senior';
       bindEvents();
+      loadMe();
       loadAll();
     })();
   </script>

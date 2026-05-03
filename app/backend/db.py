@@ -92,6 +92,16 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_questions_status ON questions(status);
             CREATE INDEX IF NOT EXISTS idx_questions_client_id ON questions(client_id);
             CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+
+            CREATE TABLE IF NOT EXISTS auth_identities (
+                student_code TEXT PRIMARY KEY,
+                display_name TEXT,
+                permissions INTEGER NOT NULL DEFAULT 0,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                note TEXT,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
             """
         )
 
@@ -145,7 +155,11 @@ def get_question(question_id: int) -> Optional[Dict[str, Any]]:
     with _connect() as conn:
         row = conn.execute(
             """
-            SELECT q.*, u.identity AS from_user_identity, u.role AS from_user_role
+            SELECT
+                q.*,
+                u.identity AS from_user_identity,
+                u.role AS from_user_role,
+                COALESCE(NULLIF(u.nickname, ''), u.identity) AS from_user_display
             FROM questions q
             JOIN users u ON u.id = q.from_user_id
             WHERE q.id = ?
@@ -167,10 +181,12 @@ def get_tracked_question(question_id: int, view_code: str) -> Optional[Dict[str,
                 q.view_code,
                 q.channel,
                 q.created_at,
+                COALESCE(NULLIF(u.nickname, ''), u.identity) AS from_user_display,
                 a.content AS answer,
                 a.answer_type,
                 a.updated_at AS answered_at
             FROM questions q
+            JOIN users u ON u.id = q.from_user_id
             LEFT JOIN answers a ON a.question_id = q.id
             WHERE q.id = ? AND q.view_code = ?
             """,
@@ -206,6 +222,34 @@ def list_questions_by_client(client_id: str, limit: int = 50) -> List[Dict[str, 
         return [dict(r) for r in rows]
 
 
+def list_questions_by_owner_identity(owner_identity: str, limit: int = 50) -> List[Dict[str, Any]]:
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                q.id,
+                q.title,
+                q.content,
+                q.status,
+                q.view_code,
+                q.channel,
+                q.created_at,
+                q.updated_at,
+                a.content AS answer,
+                a.answer_type,
+                a.updated_at AS answered_at
+            FROM questions q
+            JOIN users u ON u.id = q.from_user_id
+            LEFT JOIN answers a ON a.question_id = q.id
+            WHERE u.identity = ?
+            ORDER BY q.id DESC
+            LIMIT ?
+            """,
+            (owner_identity, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
 def list_pending_questions(limit: int = 50) -> List[Dict[str, Any]]:
     return list_pending_questions_with_query(limit=limit, query="")
 
@@ -226,7 +270,8 @@ def list_pending_questions_with_query(limit: int = 50, query: str = "") -> List[
                     q.view_code,
                     q.channel,
                     q.created_at,
-                    u.identity AS from_user_identity
+                    u.identity AS from_user_identity,
+                    COALESCE(NULLIF(u.nickname, ''), u.identity) AS from_user_display
                 FROM questions q
                 JOIN users u ON u.id = q.from_user_id
                 WHERE q.status = 'pending'
@@ -253,7 +298,8 @@ def list_pending_questions_with_query(limit: int = 50, query: str = "") -> List[
                     q.view_code,
                     q.channel,
                     q.created_at,
-                    u.identity AS from_user_identity
+                    u.identity AS from_user_identity,
+                    COALESCE(NULLIF(u.nickname, ''), u.identity) AS from_user_display
                 FROM questions q
                 JOIN users u ON u.id = q.from_user_id
                 WHERE q.status = 'pending'
@@ -283,16 +329,18 @@ def list_answered_questions(limit: int = 50, query: str = "") -> List[Dict[str, 
                     q.created_at,
                     q.updated_at,
                     u.identity AS from_user_identity,
+                    COALESCE(NULLIF(u.nickname, ''), u.identity) AS from_user_display,
                     a.content AS answer,
                     a.answer_type,
                     a.updated_at AS answered_at,
                     su.identity AS answerer_identity,
-                    su.nickname AS answerer_nickname
+                    su.nickname AS answerer_nickname,
+                    COALESCE(NULLIF(su.nickname, ''), su.identity) AS answerer_display
                 FROM questions q
                 JOIN users u ON u.id = q.from_user_id
                 JOIN answers a ON a.question_id = q.id
                 LEFT JOIN users su ON su.id = a.answerer_id
-                WHERE q.status = 'answered'
+                WHERE q.status IN ('answered', 'closed')
                   AND (
                     CAST(q.id AS TEXT) LIKE ?
                     OR q.title LIKE ?
@@ -321,16 +369,18 @@ def list_answered_questions(limit: int = 50, query: str = "") -> List[Dict[str, 
                     q.created_at,
                     q.updated_at,
                     u.identity AS from_user_identity,
+                    COALESCE(NULLIF(u.nickname, ''), u.identity) AS from_user_display,
                     a.content AS answer,
                     a.answer_type,
                     a.updated_at AS answered_at,
                     su.identity AS answerer_identity,
-                    su.nickname AS answerer_nickname
+                    su.nickname AS answerer_nickname,
+                    COALESCE(NULLIF(su.nickname, ''), su.identity) AS answerer_display
                 FROM questions q
                 JOIN users u ON u.id = q.from_user_id
                 JOIN answers a ON a.question_id = q.id
                 LEFT JOIN users su ON su.id = a.answerer_id
-                WHERE q.status = 'answered'
+                WHERE q.status IN ('answered', 'closed')
                 ORDER BY a.updated_at DESC, q.id DESC
                 LIMIT ?
                 """,
@@ -381,16 +431,21 @@ def save_answer(
         return dict(row)
 
 
-def close_question(question_id: int, client_id: Optional[str] = None, view_code: Optional[str] = None) -> bool:
+def close_question(question_id: int, owner_identity: Optional[str] = None, view_code: Optional[str] = None) -> bool:
     with _connect() as conn:
         row = conn.execute(
-            "SELECT id, client_id, view_code FROM questions WHERE id = ?",
+            """
+            SELECT q.id, q.view_code, u.identity AS owner_identity
+            FROM questions q
+            JOIN users u ON u.id = q.from_user_id
+            WHERE q.id = ?
+            """,
             (question_id,),
         ).fetchone()
         if row is None:
             return False
 
-        if client_id and row["client_id"] != client_id:
+        if owner_identity and row["owner_identity"] != owner_identity:
             return False
         if view_code and row["view_code"] != view_code:
             return False
@@ -487,3 +542,49 @@ def get_task_summary() -> Dict[str, int]:
         for r in rows:
             summary[str(r["status"])] = int(r["cnt"])
         return summary
+
+
+def get_auth_identity(student_code: str) -> Optional[Dict[str, Any]]:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM auth_identities WHERE student_code = ?",
+            (student_code,),
+        ).fetchone()
+        return _dict_row(row)
+
+
+def upsert_auth_identity(
+    student_code: str,
+    display_name: str = "",
+    permissions: int = 0,
+    enabled: bool = True,
+    note: str = "",
+) -> Dict[str, Any]:
+    now = _now_ts()
+    with _connect() as conn:
+        existing = conn.execute(
+            "SELECT student_code FROM auth_identities WHERE student_code = ?",
+            (student_code,),
+        ).fetchone()
+        if existing is None:
+            conn.execute(
+                """
+                INSERT INTO auth_identities (student_code, display_name, permissions, enabled, note, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (student_code, display_name, int(permissions), 1 if enabled else 0, note, now, now),
+            )
+        else:
+            conn.execute(
+                """
+                UPDATE auth_identities
+                SET display_name = ?, permissions = ?, enabled = ?, note = ?, updated_at = ?
+                WHERE student_code = ?
+                """,
+                (display_name, int(permissions), 1 if enabled else 0, note, now, student_code),
+            )
+        row = conn.execute(
+            "SELECT * FROM auth_identities WHERE student_code = ?",
+            (student_code,),
+        ).fetchone()
+        return dict(row)

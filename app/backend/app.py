@@ -5,14 +5,30 @@ import re
 import secrets
 import threading
 import time
+from datetime import timedelta
 from pathlib import Path
 from typing import Dict, List, Tuple
 from xml.etree import ElementTree as ET
 
 import requests
 from dotenv import load_dotenv
-from flask import Flask, Response, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, redirect, request, send_from_directory
 
+from auth import (
+    PERM_ADMIN,
+    PERM_ANSWER,
+    authenticate_bit_user,
+    build_external_identity,
+    current_user,
+    has_permission,
+    is_authenticated,
+    login_required_response,
+    login_user,
+    logout_user,
+    permission_denied_response,
+    require_permission,
+    sync_auth_identities_from_file,
+)
 from db import (
     claim_next_task,
     close_question,
@@ -24,9 +40,8 @@ from db import (
     get_tracked_question,
     init_db,
     list_answered_questions,
-    list_pending_questions,
     list_pending_questions_with_query,
-    list_questions_by_client,
+    list_questions_by_owner_identity,
     mark_task_done,
     mark_task_retry,
     save_answer,
@@ -38,6 +53,10 @@ ENV_PATH = Path(__file__).resolve().parent / ".env"
 load_dotenv(dotenv_path=ENV_PATH, override=True)
 
 app = Flask(__name__, static_folder="../web", static_url_path="")
+app.secret_key = os.getenv("SECRET_KEY", "dev-secret-key")
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=max(1, int(os.getenv("AUTH_SESSION_HOURS", "8"))))
 
 WECHAT_TOKEN = os.getenv("WECHAT_TOKEN", "replace_with_your_token")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "").rstrip("/")
@@ -61,7 +80,6 @@ FEATURE3_AUTO_AI_ANSWER = os.getenv("FEATURE3_AUTO_AI_ANSWER", "0").strip().lowe
 FEATURE3_ENABLE_WORKER = os.getenv("FEATURE3_ENABLE_WORKER", "1").strip().lower() in {"1", "true", "yes", "on"}
 FEATURE3_ENABLE_WECHAT_PUSH = os.getenv("FEATURE3_ENABLE_WECHAT_PUSH", "0").strip().lower() in {"1", "true", "yes", "on"}
 FEATURE3_WORKER_POLL_SECONDS = float(os.getenv("FEATURE3_WORKER_POLL_SECONDS", "1.5"))
-FEATURE3_SENIOR_KEY = os.getenv("FEATURE3_SENIOR_KEY", "dev-senior-key")
 FEATURE3_HELP_URL = os.getenv("FEATURE3_HELP_URL", "/freshman")
 
 FAQ_PATH = Path(__file__).resolve().parents[1] / "data" / "faq.md"
@@ -324,26 +342,8 @@ def _now_text() -> str:
     return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
 
 
-def _generate_client_id() -> str:
-    return secrets.token_hex(8)
-
-
 def _generate_view_code() -> str:
     return secrets.token_hex(4).upper()
-
-
-def _get_client_id() -> str:
-    body = request.get_json(silent=True) or {}
-    return (
-        (request.headers.get("X-Client-Id") or "").strip()
-        or (request.args.get("client_id") or "").strip()
-        or (str(body.get("client_id") or "").strip())
-    )
-
-
-def _is_senior_request() -> bool:
-    key = (request.headers.get("X-Senior-Key") or "").strip()
-    return bool(key) and key == FEATURE3_SENIOR_KEY
 
 
 def _parse_track_command(text: str) -> Tuple[int, str]:
@@ -351,6 +351,68 @@ def _parse_track_command(text: str) -> Tuple[int, str]:
     if not match:
         return (0, "")
     return (int(match.group(1)), match.group(2).upper())
+
+
+def _public_path(path: str) -> bool:
+    if path in {"/login", "/logout"}:
+        return True
+    if path.startswith("/api/auth/"):
+        return True
+    if path == "/wechat":
+        return True
+    if path.startswith("/favicon"):
+        return True
+    return False
+
+
+@app.before_request
+def require_authentication():
+    if _public_path(request.path):
+        return None
+    if not is_authenticated():
+        return login_required_response()
+    return None
+
+
+@app.get("/login")
+def login_page():
+    if is_authenticated():
+        return redirect(request.args.get("next") or "/")
+    return send_from_directory(app.static_folder, "login.html")
+
+
+@app.get("/logout")
+def logout_page():
+    logout_user()
+    return redirect("/login")
+
+
+@app.post("/api/auth/login")
+def api_auth_login():
+    data = request.get_json(silent=True) or {}
+    username = str(data.get("username") or "").strip()
+    password = str(data.get("password") or "")
+    next_url = str(data.get("next") or request.args.get("next") or "/").strip() or "/"
+    try:
+        profile = authenticate_bit_user(username=username, password=password)
+        auth_user = login_user(profile)
+        return jsonify({"ok": True, "user": auth_user, "next": next_url})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 401
+
+
+@app.post("/api/auth/logout")
+def api_auth_logout():
+    logout_user()
+    return jsonify({"ok": True})
+
+
+@app.get("/api/auth/me")
+def api_auth_me():
+    user = current_user()
+    if not user:
+        return jsonify({"error": "authentication required"}), 401
+    return jsonify({"user": user})
 
 
 def _enqueue_ai_answer_if_enabled(question_id: int) -> None:
@@ -413,6 +475,12 @@ def _start_feature3_worker() -> None:
 
 
 init_db()
+try:
+    synced = sync_auth_identities_from_file()
+    if synced:
+        app.logger.info("synced %s privileged auth identities", synced)
+except Exception as exc:
+    app.logger.warning("failed to sync auth identities: %s", exc)
 _start_feature3_worker()
 
 
@@ -438,6 +506,9 @@ def freshman_page():
 
 @app.get("/senior")
 def senior_page():
+    denied = require_permission(PERM_ANSWER)
+    if denied:
+        return denied
     return send_from_directory(app.static_folder, "senior.html")
 
 
@@ -449,14 +520,18 @@ def api_create_question():
     if not content:
         return jsonify({"error": "content is required"}), 400
 
-    client_id = _get_client_id() or _generate_client_id()
-    user = get_or_create_user(identity=f"client:{client_id}", role="freshman", source="web")
+    auth_user = current_user() or {}
+    owner_identity = str(auth_user.get("owner_identity") or "").strip()
+    if not owner_identity:
+        return jsonify({"error": "authentication required"}), 401
+
+    user = get_or_create_user(identity=owner_identity, role="freshman", source="web", nickname="已认证用户")
     question = create_question(
         from_user_id=int(user["id"]),
         title=title,
         content=content,
         channel="web",
-        client_id=client_id,
+        client_id=None,
         view_code=_generate_view_code(),
     )
     _enqueue_ai_answer_if_enabled(int(question["id"]))
@@ -467,7 +542,6 @@ def api_create_question():
                 "id": int(question["id"]),
                 "status": "pending",
                 "view_code": str(question["view_code"]),
-                "client_id": client_id,
                 "message": f"已收到，问题编号：{question['id']}。请在“我的问题”页面查看进展。",
             }
         ),
@@ -477,12 +551,13 @@ def api_create_question():
 
 @app.get("/api/questions/mine")
 def api_my_questions():
-    client_id = _get_client_id()
-    if not client_id:
-        return jsonify({"error": "client_id is required"}), 400
+    auth_user = current_user() or {}
+    owner_identity = str(auth_user.get("owner_identity") or "").strip()
+    if not owner_identity:
+        return jsonify({"error": "authentication required"}), 401
 
-    items = list_questions_by_client(client_id=client_id, limit=80)
-    return jsonify({"client_id": client_id, "items": items})
+    items = list_questions_by_owner_identity(owner_identity=owner_identity, limit=80)
+    return jsonify({"items": items})
 
 
 @app.get("/api/questions/track")
@@ -501,12 +576,13 @@ def api_track_question():
 @app.put("/api/questions/<int:question_id>/close")
 def api_close_question(question_id: int):
     data = request.get_json(silent=True) or {}
-    client_id = str(data.get("client_id") or request.args.get("client_id") or "").strip()
     view_code = str(data.get("view_code") or request.args.get("view_code") or "").strip().upper()
-    if not client_id and not view_code:
-        return jsonify({"error": "client_id or view_code is required"}), 400
+    auth_user = current_user() or {}
+    owner_identity = str(auth_user.get("owner_identity") or "").strip()
+    if not owner_identity and not view_code:
+        return jsonify({"error": "owner identity or view_code is required"}), 400
 
-    ok = close_question(question_id=question_id, client_id=client_id or None, view_code=view_code or None)
+    ok = close_question(question_id=question_id, owner_identity=owner_identity or None, view_code=view_code or None)
     if not ok:
         return jsonify({"error": "close failed"}), 403
     return jsonify({"status": "closed"})
@@ -514,8 +590,9 @@ def api_close_question(question_id: int):
 
 @app.get("/api/tasks/pending")
 def api_tasks_pending():
-    if not _is_senior_request():
-        return jsonify({"error": "forbidden"}), 403
+    denied = require_permission(PERM_ANSWER)
+    if denied:
+        return denied
 
     q = (request.args.get("q") or "").strip()
     limit_raw = (request.args.get("limit") or "80").strip()
@@ -530,8 +607,9 @@ def api_tasks_pending():
 
 @app.get("/api/tasks/answered")
 def api_tasks_answered():
-    if not _is_senior_request():
-        return jsonify({"error": "forbidden"}), 403
+    denied = require_permission(PERM_ANSWER)
+    if denied:
+        return denied
 
     q = (request.args.get("q") or "").strip()
     limit_raw = (request.args.get("limit") or "80").strip()
@@ -546,21 +624,26 @@ def api_tasks_answered():
 
 @app.post("/api/answers")
 def api_submit_answer():
-    if not _is_senior_request():
-        return jsonify({"error": "forbidden"}), 403
+    denied = require_permission(PERM_ANSWER)
+    if denied:
+        return denied
 
     data = request.get_json(silent=True) or {}
     qid = int(data.get("question_id") or 0)
     content = str(data.get("content") or "").strip()
-    senior_name = str(request.headers.get("X-Senior-Name") or "senior").strip()
     if qid <= 0 or not content:
         return jsonify({"error": "question_id and content are required"}), 400
 
     question = get_question(qid)
     if not question:
         return jsonify({"error": "question not found"}), 404
+    if str(question.get("status") or "") == "closed":
+        return jsonify({"error": "question is closed"}), 409
 
-    senior_user = get_or_create_user(identity=f"senior:{senior_name}", role="senior", source="web", nickname=senior_name)
+    auth_user = current_user() or {}
+    student_code = str(auth_user.get("student_code") or "").strip()
+    responder_name = str(auth_user.get("name") or "答复人").strip()
+    senior_user = get_or_create_user(identity=f"priv:{student_code}", role="senior", source="web", nickname=responder_name)
     save_answer(
         question_id=qid,
         content=content,
@@ -571,7 +654,7 @@ def api_submit_answer():
     push_result = {"ok": False, "skipped": True}
     if FEATURE3_ENABLE_WECHAT_PUSH:
         from_identity = str((question or {}).get("from_user_identity") or "")
-        if from_identity.startswith("wx:"):
+        if from_identity.startswith("wxraw:"):
             openid = from_identity.split(":", 1)[1]
             push_result = send_customer_message(openid, f"你的问题（{qid}）已有回复，请前往“我的问题”页面查看。")
 
@@ -580,6 +663,7 @@ def api_submit_answer():
 
 @app.get("/api/feature3_status")
 def api_feature3_status():
+    auth_user = current_user() or {}
     return jsonify(
         {
             "ticket_mode": FEATURE3_TICKET_MODE,
@@ -588,6 +672,12 @@ def api_feature3_status():
             "worker_alive": bool(WORKER_THREAD and WORKER_THREAD.is_alive()),
             "task_summary": get_task_summary(),
             "help_url": FEATURE3_HELP_URL,
+            "auth": {
+                "logged_in": bool(auth_user),
+                "user": auth_user,
+                "can_answer": has_permission(PERM_ANSWER),
+                "is_admin": has_permission(PERM_ADMIN),
+            },
         }
     )
 
@@ -722,7 +812,12 @@ def wechat():
             elif (content.startswith("查") or content.startswith("查询") or content.startswith("问题")) and (" " not in content):
                 reply_text = "查询格式示例：查 123 ABCD1234（编号+查询码）。"
             else:
-                user = get_or_create_user(identity=f"wx:{from_user}", role="freshman", source="wechat")
+                user = get_or_create_user(
+                    identity=build_external_identity("wx", from_user),
+                    role="freshman",
+                    source="wechat",
+                    nickname="微信用户",
+                )
                 question = create_question(
                     from_user_id=int(user["id"]),
                     title="",

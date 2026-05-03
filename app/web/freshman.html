@@ -220,9 +220,9 @@
       <h1>我的问题</h1>
       <div class="muted">本页面采用“主动拉取”模式：问题提交后，稍后在此查看进展与答案。</div>
       <div class="id-row">
-        <span class="muted">本设备标识:</span>
-        <span id="clientId" class="pill"></span>
-        <button id="regenBtn" class="btn secondary" type="button">重置设备标识</button>
+        <span class="muted">当前登录:</span>
+        <span id="userInfo" class="pill">加载中</span>
+        <a class="btn secondary" href="/logout">退出登录</a>
         <a class="btn secondary" href="/">返回首页</a>
       </div>
     </section>
@@ -260,8 +260,8 @@
     </section>
 
     <section class="panel">
-      <h3>我的问题（本设备）</h3>
-      <div class="muted">只显示在本设备提交的问题。如需查看公众号里提交的问题，请使用上方“按编号查询”。</div>
+      <h3>我的问题（当前账号）</h3>
+      <div class="muted">只显示当前登录账号提交的问题。如需查看公众号里提交的问题，请使用上方“按编号查询”。</div>
       <div class="row" style="margin-top: 8px;">
         <label class="muted" style="display:flex;align-items:center;gap:6px;">
           <input id="autoPollToggle" type="checkbox" />
@@ -276,28 +276,12 @@
   </main>
 
   <script>
-    const key = 'feature3_client_id';
     const seenKey = 'feature3_seen_answer_map';
     const autoPollKey = 'feature3_auto_poll';
     const POLL_MS = 12000;
     let seenAnswerMap = {};
     let firstMineLoadDone = false;
     let pollTimer = null;
-
-    function makeId() {
-      const rnd = Math.random().toString(16).slice(2, 10);
-      const ts = Date.now().toString(16).slice(-8);
-      return `c${ts}${rnd}`;
-    }
-
-    function ensureClientId() {
-      let id = localStorage.getItem(key);
-      if (!id) {
-        id = makeId();
-        localStorage.setItem(key, id);
-      }
-      return id;
-    }
 
     function statusTag(status) {
       if (status === 'answered') return '<span class="tag answered">已回答</span>';
@@ -387,10 +371,13 @@
       }[s]));
     }
 
-    function renderItem(item, canClose = false, isNewAnswer = false) {
+    function renderItem(item, options = {}) {
+      const canClose = !!options.canClose;
+      const isNewAnswer = !!options.isNewAnswer;
+      const closeMode = options.closeMode || 'mine';
       const answerHtml = item.answer ? `<div class="answer">${esc(item.answer)}</div>` : '';
       const closeBtn = (canClose && item.status === 'answered')
-        ? `<button class="btn secondary" data-close-id="${item.id}" data-view-code="${item.view_code || ''}" type="button">关闭问题</button>`
+        ? `<button class="btn secondary" data-close-id="${item.id}" data-view-code="${item.view_code || ''}" data-close-mode="${closeMode}" type="button">关闭问题</button>`
         : '';
       const itemClass = isNewAnswer ? 'item new-answer' : 'item';
       return `
@@ -408,14 +395,13 @@
     }
 
     async function loadMine({ showLoading = true, source = 'manual' } = {}) {
-      const clientId = ensureClientId();
       const listEl = document.getElementById('myList');
       if (showLoading && !listEl.innerHTML.trim()) {
         listEl.innerHTML = '<div class="muted">加载中...</div>';
       }
 
       try {
-        const res = await fetch(`/api/questions/mine?client_id=${encodeURIComponent(clientId)}`);
+        const res = await fetch('/api/questions/mine');
         const data = await res.json();
         const items = data.items || [];
         if (!items.length) {
@@ -438,7 +424,7 @@
           newCount = result.newCount;
         }
 
-        listEl.innerHTML = items.map((it) => renderItem(it, true, highlightIds.has(String(it.id)))).join('');
+        listEl.innerHTML = items.map((it) => renderItem(it, { canClose: true, isNewAnswer: highlightIds.has(String(it.id)), closeMode: 'mine' })).join('');
         if (newCount > 0) {
           showNewHint(newCount);
         } else if (source !== 'poll') {
@@ -454,7 +440,6 @@
     }
 
     async function submitQuestion() {
-      const clientId = ensureClientId();
       const title = document.getElementById('title').value.trim();
       const content = document.getElementById('content').value.trim();
       const statusEl = document.getElementById('submitStatus');
@@ -470,9 +455,8 @@
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Client-Id': clientId,
           },
-          body: JSON.stringify({ title, content, client_id: clientId }),
+          body: JSON.stringify({ title, content }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -511,26 +495,30 @@
           return;
         }
         statusEl.textContent = '查询成功';
-        resultEl.innerHTML = renderItem(data, false);
+        resultEl.innerHTML = renderItem(data, { canClose: true, closeMode: 'track' });
       } catch (err) {
         statusEl.textContent = '查询失败，请稍后重试。';
       }
     }
 
-    async function closeQuestion(questionId, viewCode) {
-      const clientId = ensureClientId();
+    async function closeQuestion(questionId, viewCode, mode = 'mine') {
+      const payload = { view_code: viewCode || '' };
       try {
         const res = await fetch(`/api/questions/${questionId}/close`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ client_id: clientId, view_code: viewCode || '' }),
+          body: JSON.stringify(payload),
         });
         const data = await res.json();
         if (!res.ok) {
           alert(data.error || '关闭失败');
           return;
         }
-        await loadMine({ showLoading: false, source: 'manual' });
+        if (mode === 'track') {
+          await trackQuestion();
+        } else {
+          await loadMine({ showLoading: false, source: 'manual' });
+        }
       } catch (err) {
         alert('关闭失败，请稍后重试。');
       }
@@ -575,16 +563,6 @@
         if (!(target instanceof HTMLInputElement)) return;
         setAutoPoll(target.checked);
       });
-      document.getElementById('regenBtn').addEventListener('click', async () => {
-        localStorage.removeItem(key);
-        localStorage.removeItem(seenKey);
-        seenAnswerMap = {};
-        firstMineLoadDone = false;
-        clearHint();
-        const id = ensureClientId();
-        document.getElementById('clientId').textContent = id;
-        await loadMine({ showLoading: true, source: 'manual' });
-      });
 
       document.getElementById('myList').addEventListener('click', (e) => {
         const target = e.target;
@@ -592,18 +570,44 @@
         const qid = target.getAttribute('data-close-id');
         if (!qid) return;
         const code = target.getAttribute('data-view-code') || '';
-        closeQuestion(Number(qid), code);
+        const mode = target.getAttribute('data-close-mode') || 'mine';
+        closeQuestion(Number(qid), code, mode);
       });
+
+      document.getElementById('trackResult').addEventListener('click', (e) => {
+        const target = e.target;
+        if (!(target instanceof HTMLElement)) return;
+        const qid = target.getAttribute('data-close-id');
+        if (!qid) return;
+        const code = target.getAttribute('data-view-code') || '';
+        const mode = target.getAttribute('data-close-mode') || 'track';
+        closeQuestion(Number(qid), code, mode);
+      });
+    }
+
+    async function loadMe() {
+      try {
+        const res = await fetch('/api/auth/me');
+        const data = await res.json();
+        if (!res.ok) {
+          document.getElementById('userInfo').textContent = '未登录';
+          return;
+        }
+        const user = data.user || {};
+        const name = user.name || user.student_code || '已登录用户';
+        document.getElementById('userInfo').textContent = name;
+      } catch (err) {
+        document.getElementById('userInfo').textContent = '加载失败';
+      }
     }
 
     (async function init() {
       seenAnswerMap = loadSeenMap();
-      const id = ensureClientId();
-      document.getElementById('clientId').textContent = id;
       const autoEnabled = isAutoPollEnabled();
       const autoToggle = document.getElementById('autoPollToggle');
       autoToggle.checked = autoEnabled;
       bindEvents();
+      await loadMe();
       await loadMine({ showLoading: true, source: 'manual' });
       if (autoEnabled) {
         startPolling();
