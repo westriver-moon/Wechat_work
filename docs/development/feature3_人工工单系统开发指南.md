@@ -15,18 +15,18 @@
 ---
 
 ## 1. 新增文件与目录（建议）
-- `feature2-ai/backend/db.py` — 数据访问层（SQLite 封装）。
-- `feature2-ai/backend/wechat_utils.py` — optional：access_token 缓存与 `send_customer_message`（非必需，H5 拉取方案可先仅记录答案）。
-- `feature2-ai/backend/worker.py`（可选）— 异步 worker；简单做法：把 worker 逻辑放入 `app.py` 启动的守护线程。
-- `feature2-ai/backend/data.db` — SQLite 数据库文件（运行时生成）。
-- `feature2-ai/backend/migrations/` — 可放置初始建表 SQL（可选）。
-- `feature2-ai/frontend/freshman.html`、`feature2-ai/frontend/senior.html` — 前端页面模板（MVP）。
+- `app/backend/db.py` — 数据访问层（SQLite 封装）。
+- `app/backend/wechat_utils.py` — optional：access_token 缓存与 `send_customer_message`（非必需，H5 拉取方案可先仅记录答案）。
+- `app/backend/worker.py`（可选）— 异步 worker；简单做法：把 worker 逻辑放入 `app.py` 启动的守护线程。
+- `app/backend/data.db` — SQLite 数据库文件（运行时生成）。
+- `app/backend/migrations/` — 可放置初始建表 SQL（可选）。
+- `app/web/freshman.html`、`app/web/senior.html` — 前端页面模板（MVP）。
 
 ---
 
 ## 2. 环境与依赖（SQLite MVP）
 - Python: 3.10+（与仓库现有要求兼容）。
-- 依赖（在 `feature2-ai/backend/requirements.txt` 补充）：
+- 依赖（在 `app/backend/requirements.txt` 补充）：
   - `PyJWT`（若选择用 JWT）
   - `SQLAlchemy`（推荐，亦可使用内置 `sqlite3`）
   - `Flask` 等（已有）
@@ -46,7 +46,7 @@ python -m venv .venv
 - `JWT_SECRET`：JWT 签名密钥（如果使用 JWT）
 - `PORT`：后端监听端口（默认 5000）
 
-权限与文件系统：确保后端进程对 `feature2-ai/backend/` 下文件有读写权限（data.db、access_token 缓存）。
+权限与文件系统：确保后端进程对 `app/backend/` 下文件有读写权限（data.db、access_token 缓存）。
 
 ---
 
@@ -243,7 +243,7 @@ def wechat_post():
 ## 10. 本地测试流程（针对 H5 拉取方案）
 1. 启动后端（开发模式）：
 ```powershell
-cd feature2-ai/backend
+cd app/backend
 .venv\Scripts\python app.py
 ```
 2. 打开 H5 页面（`freshman.html`），在本地或通过服务器地址访问并提交问题。也可模拟 `/wechat` 收到消息：POST 到 `/wechat`（测试时可跳过签名验证或用测试号）。
@@ -277,8 +277,8 @@ curl -X POST http://127.0.0.1:5000/api/questions -H "Content-Type: application/j
 ## 11. 交付清单（H5 拉取 MVP）
 - 新增文件：`db.py`、`worker.py`（或将 worker 嵌入 `app.py`）、`freshman.html`、`senior.html`。
 - 可选文件：`wechat_utils.py`（仅用于将来启用主动推送时）
-- 更新：`feature2-ai/backend/requirements.txt`（添加 SQLAlchemy / PyJWT 可选）
-- 运行产物：`feature2-ai/backend/data.db`（SQLite）。
+- 更新：`app/backend/requirements.txt`（添加 SQLAlchemy / PyJWT 可选）
+- 运行产物：`app/backend/data.db`（SQLite）。
 
 ---
 

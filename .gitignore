@@ -7,12 +7,16 @@
 **/*.pyc
 
 # Environment files with secrets
-feature2-ai/backend/.env
+app/backend/.env
+
+# Runtime files
+app/backend/*.db
+app/backend/wechat_token_cache.json
 
 # RAG index files
-feature2-ai/backend/kb_index.faiss
-feature2-ai/backend/kb_meta.json
-feature2-ai/backend/kb_texts.json
+app/backend/kb_index.faiss
+app/backend/kb_meta.json
+app/backend/kb_texts.json
 
 # OS/editor artifacts
 .DS_Store

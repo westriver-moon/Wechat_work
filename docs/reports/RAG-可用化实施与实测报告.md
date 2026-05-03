@@ -36,19 +36,19 @@
 
 新增/更新了以下 RAG 数据文件：
 
-- `feature2-ai/data/bit_freshman_rag_handbook.md`
+- `app/data/bit_freshman_rag_handbook.md`
   - 结构化内容：常用入口、入学清单、选课/宿舍/校园网/图书馆 FAQ、回答策略。
-- `feature2-ai/data/faq.md`
+- `app/data/faq.md`
   - 优化为更具体的 Q/A，减少“只有一句话”的空泛回答。
-- `feature2-ai/data/01_报到与入学准备.md`
-- `feature2-ai/data/02_学习与教务服务.md`
-- `feature2-ai/data/03_校园生活与住宿网络.md`
-- `feature2-ai/data/04_奖助学金与学生资助.md`
-- `feature2-ai/data/05_交通出行与校区导航.md`
-- `feature2-ai/data/06_医疗服务与健康保障.md`
-- `feature2-ai/data/07_校园安全与反诈指南.md`
-- `feature2-ai/data/08_军训与国防教育.md`
-- `feature2-ai/data/09_社团活动与成长路径.md`
+- `app/data/01_报到与入学准备.md`
+- `app/data/02_学习与教务服务.md`
+- `app/data/03_校园生活与住宿网络.md`
+- `app/data/04_奖助学金与学生资助.md`
+- `app/data/05_交通出行与校区导航.md`
+- `app/data/06_医疗服务与健康保障.md`
+- `app/data/07_校园安全与反诈指南.md`
+- `app/data/08_军训与国防教育.md`
+- `app/data/09_社团活动与成长路径.md`
 
 当前知识文档已经形成“报到、学业、生活、奖助、交通、医疗、安全、军训、社团”九大主题覆盖。
 
@@ -58,7 +58,7 @@
 
 ### 4.1 索引构建：从“只能向量”改为“混合可用”
 
-文件：`feature2-ai/backend/kb.py`
+文件：`app/backend/kb.py`
 
 改造点：
 - 新增索引状态文件与状态读取能力。
@@ -68,7 +68,7 @@
 
 ### 4.2 后端接口：可运维、可观测
 
-文件：`feature2-ai/backend/app.py`
+文件：`app/backend/app.py`
 
 新增接口：
 - `POST /api/rebuild_index`：重建索引。
@@ -84,7 +84,7 @@
 
 ## 5. 运行方式（当前可直接执行）
 
-在 `feature2-ai/backend/.env` 推荐配置：
+在 `app/backend/.env` 推荐配置：
 
 ```env
 DEEPSEEK_BASE_URL=https://api.deepseek.com
@@ -102,7 +102,8 @@ KB_FORCE_LEXICAL=0
 启动（Windows）：
 
 ```powershell
-cd C:\Users\pbrii\Desktop\wechat_develop\Wechar_Develop\feature2-ai\backend
+Set-Location <项目根目录>
+Set-Location .\app\backend
 .\.venv\Scripts\python.exe .\app.py
 ```
 

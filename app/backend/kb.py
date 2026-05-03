@@ -4,7 +4,6 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
-import numpy as np
 import requests
 
 try:

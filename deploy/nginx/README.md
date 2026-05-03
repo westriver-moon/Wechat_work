@@ -48,7 +48,8 @@ sudo systemctl stop nginx
 后端建议使用 Gunicorn：
 
 ```bash
-cd /opt/Wechar_Develop/feature2-ai/backend
+cd /opt/wechat_work
+cd app/backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
