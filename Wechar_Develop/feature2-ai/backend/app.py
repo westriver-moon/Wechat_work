@@ -1,6 +1,9 @@
 import hashlib
+import json
 import os
 import re
+import secrets
+import threading
 import time
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -9,6 +12,27 @@ from xml.etree import ElementTree as ET
 import requests
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, request, send_from_directory
+
+from db import (
+    claim_next_task,
+    close_question,
+    create_question,
+    enqueue_task,
+    get_or_create_user,
+    get_question,
+    get_task_summary,
+    get_tracked_question,
+    init_db,
+    list_answered_questions,
+    list_pending_questions,
+    list_pending_questions_with_query,
+    list_questions_by_client,
+    mark_task_done,
+    mark_task_retry,
+    save_answer,
+)
+from kb import build_index, index_status, query_index
+from wechat_utils import send_customer_message
 
 ENV_PATH = Path(__file__).resolve().parent / ".env"
 load_dotenv(dotenv_path=ENV_PATH, override=True)
@@ -32,9 +56,20 @@ LLM_TOP_P = float(os.getenv("LLM_TOP_P", "0.9"))
 LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "400"))
 LLM_MIN_CONFIDENCE = float(os.getenv("LLM_MIN_CONFIDENCE", "0.60"))
 
+FEATURE3_TICKET_MODE = os.getenv("FEATURE3_TICKET_MODE", "1").strip().lower() in {"1", "true", "yes", "on"}
+FEATURE3_AUTO_AI_ANSWER = os.getenv("FEATURE3_AUTO_AI_ANSWER", "0").strip().lower() in {"1", "true", "yes", "on"}
+FEATURE3_ENABLE_WORKER = os.getenv("FEATURE3_ENABLE_WORKER", "1").strip().lower() in {"1", "true", "yes", "on"}
+FEATURE3_ENABLE_WECHAT_PUSH = os.getenv("FEATURE3_ENABLE_WECHAT_PUSH", "0").strip().lower() in {"1", "true", "yes", "on"}
+FEATURE3_WORKER_POLL_SECONDS = float(os.getenv("FEATURE3_WORKER_POLL_SECONDS", "1.5"))
+FEATURE3_SENIOR_KEY = os.getenv("FEATURE3_SENIOR_KEY", "dev-senior-key")
+FEATURE3_HELP_URL = os.getenv("FEATURE3_HELP_URL", "/freshman")
+
 FAQ_PATH = Path(__file__).resolve().parents[1] / "data" / "faq.md"
-from kb import build_index, index_status, query_index
 PLACE_PAGE_PATH = Path(__file__).resolve().parents[2] / "feature1-place"
+
+TRACK_CMD_PATTERN = re.compile(r"^(?:查|查询|问题)\s*(\d+)\s+([A-Za-z0-9]{4,16})$")
+WORKER_STOP_EVENT = threading.Event()
+WORKER_THREAD = None
 
 HIGH_FREQ_CACHE: Dict[str, str] = {
     "选课": (
@@ -287,6 +322,102 @@ def build_text_reply(to_user: str, from_user: str, text: str) -> str:
     return reply
 
 
+def _now_text() -> str:
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+
+
+def _generate_client_id() -> str:
+    return secrets.token_hex(8)
+
+
+def _generate_view_code() -> str:
+    return secrets.token_hex(4).upper()
+
+
+def _get_client_id() -> str:
+    body = request.get_json(silent=True) or {}
+    return (
+        (request.headers.get("X-Client-Id") or "").strip()
+        or (request.args.get("client_id") or "").strip()
+        or (str(body.get("client_id") or "").strip())
+    )
+
+
+def _is_senior_request() -> bool:
+    key = (request.headers.get("X-Senior-Key") or "").strip()
+    return bool(key) and key == FEATURE3_SENIOR_KEY
+
+
+def _parse_track_command(text: str) -> Tuple[int, str]:
+    match = TRACK_CMD_PATTERN.match((text or "").strip())
+    if not match:
+        return (0, "")
+    return (int(match.group(1)), match.group(2).upper())
+
+
+def _enqueue_ai_answer_if_enabled(question_id: int) -> None:
+    if FEATURE3_AUTO_AI_ANSWER:
+        enqueue_task("ai_answer", {"question_id": question_id}, max_attempts=3)
+
+
+def _process_task(task: Dict) -> None:
+    task_type = str(task.get("type") or "").strip()
+    payload = task.get("payload") or {}
+    if task_type != "ai_answer":
+        return
+
+    question_id = int(payload.get("question_id") or 0)
+    if question_id <= 0:
+        raise ValueError("invalid_question_id")
+
+    question = get_question(question_id)
+    if not question:
+        return
+    if question.get("status") != "pending":
+        return
+
+    answer_text = build_answer(str(question.get("content") or "").strip())
+    if not answer_text:
+        raise RuntimeError("empty_answer_text")
+
+    save_answer(question_id=question_id, content=answer_text, answer_type="ai")
+
+
+def _worker_loop() -> None:
+    app.logger.info("feature3 worker started")
+    while not WORKER_STOP_EVENT.is_set():
+        try:
+            task = claim_next_task()
+            if not task:
+                WORKER_STOP_EVENT.wait(FEATURE3_WORKER_POLL_SECONDS)
+                continue
+
+            task_id = int(task.get("id"))
+            try:
+                _process_task(task)
+                mark_task_done(task_id)
+            except Exception as exc:
+                mark_task_retry(task_id, str(exc))
+                app.logger.warning("feature3 task failed: id=%s err=%s", task_id, exc)
+        except Exception as exc:
+            app.logger.warning("feature3 worker loop error: %s", exc)
+            WORKER_STOP_EVENT.wait(FEATURE3_WORKER_POLL_SECONDS)
+
+
+def _start_feature3_worker() -> None:
+    global WORKER_THREAD
+    if not FEATURE3_ENABLE_WORKER:
+        return
+    if WORKER_THREAD and WORKER_THREAD.is_alive():
+        return
+    WORKER_THREAD = threading.Thread(target=_worker_loop, daemon=True)
+    WORKER_THREAD.start()
+
+
+init_db()
+_start_feature3_worker()
+
+
 @app.get("/")
 def index():
     return send_from_directory(app.static_folder, "index.html")
@@ -300,6 +431,167 @@ def chat_page():
 @app.get("/place")
 def place_page():
     return send_from_directory(PLACE_PAGE_PATH, "index.html")
+
+
+@app.get("/freshman")
+def freshman_page():
+    return send_from_directory(app.static_folder, "freshman.html")
+
+
+@app.get("/senior")
+def senior_page():
+    return send_from_directory(app.static_folder, "senior.html")
+
+
+@app.post("/api/questions")
+def api_create_question():
+    data = request.get_json(silent=True) or {}
+    content = str(data.get("content") or "").strip()
+    title = str(data.get("title") or "").strip()
+    if not content:
+        return jsonify({"error": "content is required"}), 400
+
+    client_id = _get_client_id() or _generate_client_id()
+    user = get_or_create_user(identity=f"client:{client_id}", role="freshman", source="web")
+    question = create_question(
+        from_user_id=int(user["id"]),
+        title=title,
+        content=content,
+        channel="web",
+        client_id=client_id,
+        view_code=_generate_view_code(),
+    )
+    _enqueue_ai_answer_if_enabled(int(question["id"]))
+
+    return (
+        jsonify(
+            {
+                "id": int(question["id"]),
+                "status": "pending",
+                "view_code": str(question["view_code"]),
+                "client_id": client_id,
+                "message": f"已收到，问题编号：{question['id']}。请在“我的问题”页面查看进展。",
+            }
+        ),
+        201,
+    )
+
+
+@app.get("/api/questions/mine")
+def api_my_questions():
+    client_id = _get_client_id()
+    if not client_id:
+        return jsonify({"error": "client_id is required"}), 400
+
+    items = list_questions_by_client(client_id=client_id, limit=80)
+    return jsonify({"client_id": client_id, "items": items})
+
+
+@app.get("/api/questions/track")
+def api_track_question():
+    qid_raw = (request.args.get("qid") or "").strip()
+    code = (request.args.get("code") or "").strip().upper()
+    if not qid_raw.isdigit() or not code:
+        return jsonify({"error": "qid and code are required"}), 400
+
+    item = get_tracked_question(question_id=int(qid_raw), view_code=code)
+    if not item:
+        return jsonify({"error": "question not found"}), 404
+    return jsonify(item)
+
+
+@app.put("/api/questions/<int:question_id>/close")
+def api_close_question(question_id: int):
+    data = request.get_json(silent=True) or {}
+    client_id = str(data.get("client_id") or request.args.get("client_id") or "").strip()
+    view_code = str(data.get("view_code") or request.args.get("view_code") or "").strip().upper()
+    if not client_id and not view_code:
+        return jsonify({"error": "client_id or view_code is required"}), 400
+
+    ok = close_question(question_id=question_id, client_id=client_id or None, view_code=view_code or None)
+    if not ok:
+        return jsonify({"error": "close failed"}), 403
+    return jsonify({"status": "closed"})
+
+
+@app.get("/api/tasks/pending")
+def api_tasks_pending():
+    if not _is_senior_request():
+        return jsonify({"error": "forbidden"}), 403
+
+    q = (request.args.get("q") or "").strip()
+    limit_raw = (request.args.get("limit") or "80").strip()
+    try:
+        limit = int(limit_raw)
+    except ValueError:
+        limit = 80
+
+    items = list_pending_questions_with_query(limit=limit, query=q)
+    return jsonify({"items": items, "query": q})
+
+
+@app.get("/api/tasks/answered")
+def api_tasks_answered():
+    if not _is_senior_request():
+        return jsonify({"error": "forbidden"}), 403
+
+    q = (request.args.get("q") or "").strip()
+    limit_raw = (request.args.get("limit") or "80").strip()
+    try:
+        limit = int(limit_raw)
+    except ValueError:
+        limit = 80
+
+    items = list_answered_questions(limit=limit, query=q)
+    return jsonify({"items": items, "query": q})
+
+
+@app.post("/api/answers")
+def api_submit_answer():
+    if not _is_senior_request():
+        return jsonify({"error": "forbidden"}), 403
+
+    data = request.get_json(silent=True) or {}
+    qid = int(data.get("question_id") or 0)
+    content = str(data.get("content") or "").strip()
+    senior_name = str(request.headers.get("X-Senior-Name") or "senior").strip()
+    if qid <= 0 or not content:
+        return jsonify({"error": "question_id and content are required"}), 400
+
+    question = get_question(qid)
+    if not question:
+        return jsonify({"error": "question not found"}), 404
+
+    senior_user = get_or_create_user(identity=f"senior:{senior_name}", role="senior", source="web", nickname=senior_name)
+    save_answer(
+        question_id=qid,
+        content=content,
+        answerer_id=int(senior_user["id"]),
+        answer_type="senior",
+    )
+
+    push_result = {"ok": False, "skipped": True}
+    if FEATURE3_ENABLE_WECHAT_PUSH:
+        from_identity = str((question or {}).get("from_user_identity") or "")
+        if from_identity.startswith("wx:"):
+            openid = from_identity.split(":", 1)[1]
+            push_result = send_customer_message(openid, f"你的问题（{qid}）已有回复，请前往“我的问题”页面查看。")
+
+    return jsonify({"status": "ok", "push": push_result})
+
+
+@app.get("/api/feature3_status")
+def api_feature3_status():
+    return jsonify(
+        {
+            "ticket_mode": FEATURE3_TICKET_MODE,
+            "auto_ai_answer": FEATURE3_AUTO_AI_ANSWER,
+            "worker_enabled": FEATURE3_ENABLE_WORKER,
+            "worker_alive": bool(WORKER_THREAD and WORKER_THREAD.is_alive()),
+            "task_summary": get_task_summary(),
+            "help_url": FEATURE3_HELP_URL,
+        }
+    )
 
 
 @app.post("/api/chat")
@@ -354,6 +646,7 @@ def api_kb_query():
 def api_demo_status():
     provider = "deepseek" if DEEPSEEK_API_KEY else ("openai-compatible" if OPENAI_API_KEY else "faq-only")
     kb = index_status()
+    task_summary = get_task_summary()
     return jsonify({
         "provider": provider,
         "llm_enabled": bool(LLM_BASE_URL and LLM_API_KEY),
@@ -363,11 +656,24 @@ def api_demo_status():
         "kb_backend": kb.get("backend", "none"),
         "kb_doc_count": kb.get("doc_count", 0),
         "kb_error": kb.get("error", ""),
+        "feature3": {
+            "ticket_mode": FEATURE3_TICKET_MODE,
+            "auto_ai_answer": FEATURE3_AUTO_AI_ANSWER,
+            "worker_enabled": FEATURE3_ENABLE_WORKER,
+            "worker_alive": bool(WORKER_THREAD and WORKER_THREAD.is_alive()),
+            "task_summary": task_summary,
+            "help_url": FEATURE3_HELP_URL,
+        },
         "routes": {
             "chat_page": "/chat",
             "chat_api": "/api/chat",
             "kb_query_api": "/api/kb_query",
             "rebuild_index_api": "/api/rebuild_index",
+            "freshman_page": "/freshman",
+            "senior_page": "/senior",
+            "feature3_status_api": "/api/feature3_status",
+            "feature3_pending_api": "/api/tasks/pending",
+            "feature3_answered_api": "/api/tasks/answered",
         },
     })
 
@@ -399,8 +705,40 @@ def wechat():
         content = xml_root.findtext("Content", default="").strip()
         if not content:
             reply_text = "请先输入你的问题，例如：新生如何选课？"
-        else:
+        elif not FEATURE3_TICKET_MODE:
             reply_text = build_answer(content)
+        else:
+            qid, code = _parse_track_command(content)
+            if qid > 0 and code:
+                tracked = get_tracked_question(qid, code)
+                if not tracked:
+                    reply_text = "未找到对应问题，请检查编号和查询码是否正确。"
+                elif tracked.get("status") == "answered" and tracked.get("answer"):
+                    answer_text = str(tracked.get("answer") or "").strip()
+                    answer_text = answer_text[:560]
+                    reply_text = f"问题 {qid} 当前状态：已回复\n\n{answer_text}\n\n如需完整内容，请前往我的问题页面查看。"
+                elif tracked.get("status") == "closed":
+                    reply_text = f"问题 {qid} 已关闭。你仍可在“我的问题”页面查看历史记录。"
+                else:
+                    reply_text = f"问题 {qid} 正在处理中。请稍后前往“我的问题”页面查看。"
+            elif (content.startswith("查") or content.startswith("查询") or content.startswith("问题")) and (" " not in content):
+                reply_text = "查询格式示例：查 123 ABCD1234（编号+查询码）。"
+            else:
+                user = get_or_create_user(identity=f"wx:{from_user}", role="freshman", source="wechat")
+                question = create_question(
+                    from_user_id=int(user["id"]),
+                    title="",
+                    content=content,
+                    channel="wechat",
+                    client_id=None,
+                    view_code=_generate_view_code(),
+                )
+                _enqueue_ai_answer_if_enabled(int(question["id"]))
+                reply_text = (
+                    f"已收到（{_now_text()}）。问题编号：{question['id']}，查询码：{question['view_code']}。\n"
+                    f"请打开“我的问题”页面（{FEATURE3_HELP_URL}）查看进展；\n"
+                    f"或发送：查 {question['id']} {question['view_code']}"
+                )
 
         xml_reply = build_text_reply(from_user, to_user, reply_text)
         return Response(xml_reply, mimetype="application/xml")

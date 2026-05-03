@@ -25,7 +25,7 @@ sudo ln -sf /etc/nginx/sites-available/wechat_assistant.conf /etc/nginx/sites-en
 
 ## 3. 修改配置中的关键项
 
-- `server_name example.com` 改为你的真实域名
+- `server_name bitist.top` 已按现网域名填写
 - `ssl_certificate` 和 `ssl_certificate_key` 改为证书路径（示例 `/etc/letsencrypt/live/...`）
 
 ## 4. 检查并重载 Nginx
@@ -57,11 +57,11 @@ gunicorn -w 2 -b 127.0.0.1:5000 app:app
 
 ## 6. 配置公众号地址
 
-- 公众号服务器 URL: `https://你的域名/wechat`
-- 菜单统一入口: `https://你的域名/`
+- 公众号服务器 URL: `https://bitist.top/wechat`
+- 菜单统一入口: `https://bitist.top/`
 - 或者拆分菜单:
-  - `https://你的域名/chat`
-  - `https://你的域名/place`
+  - `https://bitist.top/chat`
+  - `https://bitist.top/place`
 
 ## 7. 建议：把后端做成 systemd 服务
 
@@ -72,8 +72,8 @@ gunicorn -w 2 -b 127.0.0.1:5000 app:app
 部署后执行：
 
 ```bash
-curl -X POST 'https://你的域名/api/rebuild_index'
-curl 'https://你的域名/api/demo_status'
+curl -X POST 'https://bitist.top/api/rebuild_index'
+curl 'https://bitist.top/api/demo_status'
 ```
 
 预期：

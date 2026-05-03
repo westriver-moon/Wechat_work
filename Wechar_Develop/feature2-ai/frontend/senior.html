@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>学长处理台 - 人工工单</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --ink: #12263d;
+      --muted: #60738a;
+      --line: #d9e2ee;
+      --card: #fff;
+      --brand: #0f6fb2;
+      --brand-2: #1d8fd5;
+      --shadow: 0 14px 28px rgba(15, 60, 99, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 10%, rgba(15, 111, 178, 0.18), transparent 34%),
+        radial-gradient(circle at 90% 90%, rgba(29, 143, 213, 0.14), transparent 34%),
+        var(--bg);
+      padding: 14px;
+      display: grid;
+      place-items: center;
+    }
+
+    .wrap {
+      width: min(980px, 100%);
+      display: grid;
+      gap: 12px;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 14px;
+    }
+
+    h1, h3 { margin: 0; }
+
+    .muted { color: var(--muted); font-size: 13px; }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-top: 8px;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .sub {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .count {
+      font-size: 12px;
+      color: #225478;
+      background: #edf6fd;
+      border: 1px solid #c9deef;
+      border-radius: 999px;
+      padding: 2px 8px;
+    }
+
+    input, textarea, button {
+      font-family: inherit;
+      font-size: 14px;
+    }
+
+    input, textarea {
+      border: 1px solid #c9d7e5;
+      border-radius: 9px;
+      padding: 8px 10px;
+      outline: none;
+      background: #fff;
+    }
+
+    input:focus, textarea:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(15, 111, 178, 0.12);
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 96px;
+      resize: vertical;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 9px;
+      min-height: 36px;
+      padding: 0 14px;
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      background: linear-gradient(120deg, var(--brand), var(--brand-2));
+    }
+
+    .btn.secondary {
+      color: #255476;
+      background: #edf5fb;
+      border: 1px solid #c5d9e9;
+    }
+
+    .list {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .item {
+      border: 1px solid #d6e3ef;
+      border-radius: 12px;
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+      background: #fff;
+    }
+
+    .head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .qid {
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .note {
+      font-size: 12px;
+      color: #3f5f7a;
+      background: #f4f9fd;
+      border: 1px dashed #b8d4e8;
+      border-radius: 8px;
+      padding: 6px 8px;
+    }
+
+    .answer {
+      background: #f7fbff;
+      border: 1px dashed #b6d6ea;
+      border-radius: 8px;
+      padding: 8px;
+      white-space: pre-wrap;
+      line-height: 1.6;
+      font-size: 13px;
+    }
+
+    @media (max-width: 920px) {
+      .board {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="panel">
+      <h1>学长处理台</h1>
+      <div class="muted">无登录 MVP：使用学长密钥调用待办与提交接口。上线前请替换为正式鉴权方案。</div>
+      <div class="row">
+        <input id="seniorName" type="text" placeholder="学长昵称（如 seniorA）" style="min-width: 180px;" />
+        <input id="seniorKey" type="password" placeholder="X-Senior-Key" style="min-width: 220px;" />
+        <input id="searchInput" type="text" placeholder="搜索编号/提问/回答/查询码" style="min-width: 220px;" />
+        <button id="saveKeyBtn" class="btn secondary" type="button">保存密钥</button>
+        <button id="searchBtn" class="btn secondary" type="button">搜索</button>
+        <button id="refreshBtn" class="btn" type="button">刷新待办</button>
+        <a class="btn secondary" href="/">返回首页</a>
+      </div>
+      <div id="status" class="muted" style="margin-top: 8px;"></div>
+    </section>
+
+    <section class="board">
+      <section class="panel">
+        <div class="sub">
+          <h3>待处理问题</h3>
+          <span id="pendingCount" class="count">0</span>
+        </div>
+        <div id="pendingList" class="list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="sub">
+          <h3>已回答问题</h3>
+          <span id="answeredCount" class="count">0</span>
+        </div>
+        <div id="answeredList" class="list"></div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const keyStorage = 'feature3_senior_key';
+    const nameStorage = 'feature3_senior_name';
+    let currentQuery = '';
+
+    function esc(text) {
+      return (text || '').replace(/[&<>"']/g, (s) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[s]));
+    }
+
+    function getSeniorKey() {
+      return (document.getElementById('seniorKey').value || '').trim();
+    }
+
+    function getSeniorName() {
+      return (document.getElementById('seniorName').value || 'senior').trim();
+    }
+
+    function getSearchQuery() {
+      return (document.getElementById('searchInput').value || '').trim();
+    }
+
+    function fmtTs(v) {
+      const n = Number(v || 0);
+      if (!n) return '-';
+      try {
+        return new Date(n * 1000).toLocaleString();
+      } catch (err) {
+        return String(v);
+      }
+    }
+
+    function pendingCard(item) {
+      return `
+        <article class="item">
+          <div class="head">
+            <div class="qid">#${item.id} ${esc(item.title || '未命名问题')}</div>
+            <div class="muted">${esc(item.channel || '-')} · 查询码 ${esc(item.view_code || '-')}</div>
+          </div>
+          <div>${esc(item.content || '')}</div>
+          <div class="note">来自: ${esc(item.from_user_identity || '-')} · 提交时间: ${esc(fmtTs(item.created_at))}</div>
+          <textarea placeholder="请输入你的人工回复" data-answer-for="${item.id}"></textarea>
+          <div class="row">
+            <button class="btn" data-submit-for="${item.id}" type="button">提交回复</button>
+          </div>
+        </article>
+      `;
+    }
+
+    function answeredCard(item) {
+      return `
+        <article class="item">
+          <div class="head">
+            <div class="qid">#${item.id} ${esc(item.title || '未命名问题')}</div>
+            <div class="muted">${esc(item.channel || '-')} · 查询码 ${esc(item.view_code || '-')}</div>
+          </div>
+          <div>${esc(item.content || '')}</div>
+          <div class="answer">${esc(item.answer || '')}</div>
+          <div class="note">提问者: ${esc(item.from_user_identity || '-')} · 回答者: ${esc(item.answerer_nickname || item.answerer_identity || '-')} · 回答时间: ${esc(fmtTs(item.answered_at))}</div>
+        </article>
+      `;
+    }
+
+    function setStatus(text) {
+      document.getElementById('status').textContent = text;
+    }
+
+    async function loadPending() {
+      const listEl = document.getElementById('pendingList');
+      const countEl = document.getElementById('pendingCount');
+      const key = getSeniorKey();
+      if (!key) {
+        setStatus('请先输入学长密钥。');
+        return;
+      }
+
+      listEl.innerHTML = '';
+      try {
+        const res = await fetch(`/api/tasks/pending?q=${encodeURIComponent(currentQuery)}`, {
+          headers: { 'X-Senior-Key': key },
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setStatus(data.error || '加载失败');
+          countEl.textContent = '0';
+          return;
+        }
+
+        const items = data.items || [];
+        countEl.textContent = `${items.length}`;
+        if (!items.length) {
+          listEl.innerHTML = '<div class="muted">暂无待办问题。</div>';
+          return;
+        }
+        listEl.innerHTML = items.map(pendingCard).join('');
+      } catch (err) {
+        setStatus('网络异常，请稍后再试。');
+        countEl.textContent = '0';
+      }
+    }
+
+    async function loadAnswered() {
+      const listEl = document.getElementById('answeredList');
+      const countEl = document.getElementById('answeredCount');
+      const key = getSeniorKey();
+      if (!key) {
+        return;
+      }
+
+      listEl.innerHTML = '';
+      try {
+        const res = await fetch(`/api/tasks/answered?q=${encodeURIComponent(currentQuery)}`, {
+          headers: { 'X-Senior-Key': key },
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          countEl.textContent = '0';
+          return;
+        }
+
+        const items = data.items || [];
+        countEl.textContent = `${items.length}`;
+        if (!items.length) {
+          listEl.innerHTML = '<div class="muted">暂无已回答记录。</div>';
+          return;
+        }
+        listEl.innerHTML = items.map(answeredCard).join('');
+      } catch (err) {
+        countEl.textContent = '0';
+      }
+    }
+
+    async function loadAll() {
+      const key = getSeniorKey();
+      if (!key) {
+        setStatus('请先输入学长密钥。');
+        return;
+      }
+      setStatus(`加载中...${currentQuery ? `（搜索: ${currentQuery}）` : ''}`);
+      await Promise.all([loadPending(), loadAnswered()]);
+      setStatus(`加载完成${currentQuery ? `，当前搜索：${currentQuery}` : ''}`);
+    }
+
+    async function submitAnswer(questionId) {
+      const key = getSeniorKey();
+      const seniorName = getSeniorName();
+      const ta = document.querySelector(`textarea[data-answer-for="${questionId}"]`);
+      const content = ta ? ta.value.trim() : '';
+
+      if (!key) {
+        setStatus('请先输入学长密钥。');
+        return;
+      }
+      if (!content) {
+        setStatus('请输入回复内容后再提交。');
+        return;
+      }
+
+      setStatus(`正在提交 #${questionId} ...`);
+      try {
+        const res = await fetch('/api/answers', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Senior-Key': key,
+            'X-Senior-Name': seniorName,
+          },
+          body: JSON.stringify({ question_id: Number(questionId), content }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setStatus(data.error || '提交失败');
+          return;
+        }
+
+        setStatus(`#${questionId} 提交成功`);
+        await loadAll();
+      } catch (err) {
+        setStatus('提交失败，请稍后重试。');
+      }
+    }
+
+    function saveKey() {
+      const key = getSeniorKey();
+      const name = getSeniorName();
+      localStorage.setItem(keyStorage, key);
+      localStorage.setItem(nameStorage, name);
+      setStatus('密钥和昵称已保存到本地。');
+    }
+
+    function doSearch() {
+      currentQuery = getSearchQuery();
+      loadAll();
+    }
+
+    function bindEvents() {
+      document.getElementById('saveKeyBtn').addEventListener('click', saveKey);
+      document.getElementById('refreshBtn').addEventListener('click', () => {
+        currentQuery = '';
+        document.getElementById('searchInput').value = '';
+        loadAll();
+      });
+      document.getElementById('searchBtn').addEventListener('click', doSearch);
+      document.getElementById('searchInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          doSearch();
+        }
+      });
+      document.getElementById('pendingList').addEventListener('click', (e) => {
+        const target = e.target;
+        if (!(target instanceof HTMLElement)) return;
+        const qid = target.getAttribute('data-submit-for');
+        if (!qid) return;
+        submitAnswer(Number(qid));
+      });
+    }
+
+    (function init() {
+      document.getElementById('seniorKey').value = localStorage.getItem(keyStorage) || '';
+      document.getElementById('seniorName').value = localStorage.getItem(nameStorage) || 'senior';
+      bindEvents();
+      loadAll();
+    })();
+  </script>
+</body>
+</html>
