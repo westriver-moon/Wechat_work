@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BIT 登录 - 北理新生助手</title>
+  <style>
+    :root {
+      --bg: #eef4fb;
+      --ink: #15314d;
+      --muted: #5d7288;
+      --card: rgba(255, 255, 255, 0.96);
+      --line: #d8e4ef;
+      --brand: #0d5ec9;
+      --brand-2: #1c87ff;
+      --danger: #b42318;
+      --shadow: 0 18px 42px rgba(17, 76, 143, 0.16);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 10%, rgba(13, 94, 201, 0.22), transparent 34%),
+        radial-gradient(circle at 90% 90%, rgba(28, 135, 255, 0.18), transparent 36%),
+        linear-gradient(155deg, #f7fbff, var(--bg));
+      display: grid;
+      place-items: center;
+      padding: 18px;
+    }
+
+    .shell {
+      width: min(1040px, 100%);
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 18px;
+    }
+
+    .hero, .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 28px;
+      display: grid;
+      gap: 18px;
+      align-content: start;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: 32px;
+      line-height: 1.2;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.75;
+      font-size: 15px;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .chip {
+      border-radius: 999px;
+      border: 1px solid #cfe0f2;
+      background: #f3f9ff;
+      color: #18466f;
+      font-size: 13px;
+      padding: 6px 10px;
+      font-weight: 700;
+    }
+
+    .panel {
+      padding: 24px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .panel h2 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: #31516d;
+      margin-bottom: 6px;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid #c6d7e8;
+      border-radius: 12px;
+      padding: 12px 13px;
+      font-size: 15px;
+      outline: none;
+      background: #fff;
+    }
+
+    input:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(13, 94, 201, 0.15);
+    }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      min-height: 46px;
+      padding: 0 16px;
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      background: linear-gradient(120deg, var(--brand), var(--brand-2));
+    }
+
+    .status {
+      min-height: 22px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    @media (max-width: 860px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+      .hero h1 {
+        font-size: 26px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="chips">
+        <span class="chip">BIT 统一身份认证</span>
+        <span class="chip">登录后方可使用</span>
+      </div>
+      <h1>北理新生助手</h1>
+      <p>当前系统已切换为正式登录模式。未登录时，地点查询、智能问答、人工工单和学长处理台均不可使用。</p>
+      <p>系统使用 `bit-login` 接入北京理工大学统一身份认证。普通用户登录后只保留会话，不在本地落实名；本地仅维护少量特权身份及其权限位，用于后续管理员和答复人扩展。</p>
+    </section>
+
+    <section class="panel">
+      <h2>登录</h2>
+      <div class="muted">请输入你的 BIT 统一身份认证账号和密码。</div>
+
+      <div>
+        <label for="username">账号</label>
+        <input id="username" type="text" autocomplete="username" placeholder="例如：学号/工号" />
+      </div>
+
+      <div>
+        <label for="password">密码</label>
+        <input id="password" type="password" autocomplete="current-password" placeholder="请输入密码" />
+      </div>
+
+      <button id="loginBtn" type="button">登录系统</button>
+      <div id="status" class="status"></div>
+    </section>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const nextUrl = params.get('next') || '/';
+
+    function setStatus(text, isError = false) {
+      const el = document.getElementById('status');
+      el.textContent = text;
+      el.className = isError ? 'status error' : 'status';
+    }
+
+    async function submitLogin() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      if (!username || !password) {
+        setStatus('请输入账号和密码。', true);
+        return;
+      }
+
+      setStatus('登录中...');
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, next: nextUrl }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          setStatus(data.error || '登录失败', true);
+          return;
+        }
+        window.location.href = data.next || '/';
+      } catch (err) {
+        setStatus('网络异常，请稍后重试。', true);
+      }
+    }
+
+    document.getElementById('loginBtn').addEventListener('click', submitLogin);
+    document.getElementById('password').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitLogin();
+      }
+    });
+  </script>
+</body>
+</html>

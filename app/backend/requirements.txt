@@ -1,3 +1,4 @@
 Flask==3.0.3
 python-dotenv==1.0.1
 requests==2.32.3
+bit_login @ git+https://github.com/BIT101-dev/bit-login.git@55a375dffe7a8f9d5eab98ad75e10a4b395fc820

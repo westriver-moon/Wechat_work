@@ -135,6 +135,22 @@
       text-align: center;
     }
 
+    .authbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .auth-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
     @media (max-width: 760px) {
       .grid { grid-template-columns: 1fr; }
       .hero h1 { font-size: 24px; }
@@ -144,6 +160,12 @@
 <body>
   <main class="wrap">
     <section class="hero">
+      <div class="authbar">
+        <span>当前登录: <strong id="me">加载中</strong></span>
+        <div class="auth-actions">
+          <a class="action" href="/logout" style="min-height:36px;padding:0 14px;">退出登录</a>
+        </div>
+      </div>
       <h1>北理新生助手</h1>
       <p>请选择需要使用的功能页面，支持地点查询、智能问答与人工工单服务。</p>
     </section>
@@ -176,5 +198,17 @@
 
     <div class="tip">建议将此页面配置为公众号菜单入口。</div>
   </main>
+  <script>
+    (async function loadMe() {
+      try {
+        const res = await fetch('/api/auth/me');
+        const data = await res.json();
+        const user = (res.ok && data.user) ? data.user : {};
+        document.getElementById('me').textContent = user.name || user.student_code || '已登录用户';
+      } catch (err) {
+        document.getElementById('me').textContent = '已登录用户';
+      }
+    })();
+  </script>
 </body>
 </html>

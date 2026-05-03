@@ -1,0 +1,16 @@
+[
+  {
+    "student_code": "1120230001",
+    "display_name": "示例管理员",
+    "permissions": ["answer", "admin"],
+    "enabled": true,
+    "note": "示例：管理员兼答复人"
+  },
+  {
+    "student_code": "1120230002",
+    "display_name": "示例答复人",
+    "permissions": ["answer"],
+    "enabled": true,
+    "note": "示例：仅可进入学长处理台"
+  }
+]

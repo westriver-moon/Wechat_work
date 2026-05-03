@@ -8,6 +8,7 @@
 
 # Environment files with secrets
 app/backend/.env
+app/backend/auth_identities.json
 
 # Runtime files
 app/backend/*.db
