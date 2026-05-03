@@ -9,7 +9,7 @@
    - `DB_PATH=./feature3.db`
 
 ## 2. 启动
-在 `feature2-ai/backend` 目录执行：
+在 `app/backend` 目录执行：
 
 ```powershell
 .venv\Scripts\python app.py

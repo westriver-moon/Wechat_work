@@ -37,7 +37,7 @@ from wechat_utils import send_customer_message
 ENV_PATH = Path(__file__).resolve().parent / ".env"
 load_dotenv(dotenv_path=ENV_PATH, override=True)
 
-app = Flask(__name__, static_folder="../frontend", static_url_path="")
+app = Flask(__name__, static_folder="../web", static_url_path="")
 
 WECHAT_TOKEN = os.getenv("WECHAT_TOKEN", "replace_with_your_token")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "").rstrip("/")
@@ -65,8 +65,6 @@ FEATURE3_SENIOR_KEY = os.getenv("FEATURE3_SENIOR_KEY", "dev-senior-key")
 FEATURE3_HELP_URL = os.getenv("FEATURE3_HELP_URL", "/freshman")
 
 FAQ_PATH = Path(__file__).resolve().parents[1] / "data" / "faq.md"
-PLACE_PAGE_PATH = Path(__file__).resolve().parents[2] / "feature1-place"
-
 TRACK_CMD_PATTERN = re.compile(r"^(?:查|查询|问题)\s*(\d+)\s+([A-Za-z0-9]{4,16})$")
 WORKER_STOP_EVENT = threading.Event()
 WORKER_THREAD = None
@@ -430,7 +428,7 @@ def chat_page():
 
 @app.get("/place")
 def place_page():
-    return send_from_directory(PLACE_PAGE_PATH, "index.html")
+    return send_from_directory(app.static_folder, "place.html")
 
 
 @app.get("/freshman")

@@ -31,11 +31,12 @@ sudo apt install -y git python3 python3-venv python3-pip nginx
 ## 3. 代码与 Python 环境
 
 ```bash
-sudo mkdir -p /opt/wechar_develop
-sudo chown -R $USER:$USER /opt/wechar_develop
+sudo mkdir -p /opt/wechat_work
+sudo chown -R $USER:$USER /opt/wechat_work
 
 # 上传或拉取代码后进入后端目录
-cd /opt/wechar_develop/Wechar_Develop/feature2-ai/backend
+cd /opt/wechat_work
+cd app/backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -U pip
@@ -73,7 +74,8 @@ KB_FORCE_LEXICAL=1
 ## 5. Gunicorn 手动验证
 
 ```bash
-cd /opt/wechar_develop/Wechar_Develop/feature2-ai/backend
+cd /opt/wechat_work
+cd app/backend
 source .venv/bin/activate
 gunicorn -w 2 -b 127.0.0.1:5000 app:app
 ```
@@ -97,9 +99,9 @@ After=network.target
 Type=simple
 User=www-data
 Group=www-data
-WorkingDirectory=/opt/wechar_develop/Wechar_Develop/feature2-ai/backend
-Environment="PATH=/opt/wechar_develop/Wechar_Develop/feature2-ai/backend/.venv/bin"
-ExecStart=/opt/wechar_develop/Wechar_Develop/feature2-ai/backend/.venv/bin/gunicorn -w 2 -b 127.0.0.1:5000 app:app
+WorkingDirectory=/opt/wechat_work/app/backend
+Environment="PATH=/opt/wechat_work/app/backend/.venv/bin"
+ExecStart=/opt/wechat_work/app/backend/.venv/bin/gunicorn -w 2 -b 127.0.0.1:5000 app:app
 Restart=always
 RestartSec=3
 
@@ -107,7 +109,7 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF
 
-sudo chown -R www-data:www-data /opt/wechar_develop/Wechar_Develop/feature2-ai/backend
+sudo chown -R www-data:www-data /opt/wechat_work/app/backend
 sudo systemctl daemon-reload
 sudo systemctl enable wechar-feature3
 sudo systemctl restart wechar-feature3
@@ -166,7 +168,8 @@ curl https://bitist.top/api/feature3_status
 数据库备份：
 
 ```bash
-cd /opt/wechar_develop/Wechar_Develop/feature2-ai/backend
+cd /opt/wechat_work
+cd app/backend
 cp feature3.db feature3.db.bak.$(date +%F-%H%M%S)
 ```
 

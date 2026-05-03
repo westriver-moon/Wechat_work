@@ -1,6 +1,6 @@
 # Ubuntu 24.04 LTS 上线前检查与一键部署（腾讯云）
 
-适用项目：Wechar_Develop（功能1+功能2）
+适用项目：当前仓库根目录（功能1+功能2）
 
 ## 1. 上线前检查清单
 
@@ -10,27 +10,31 @@
 - [ ] 腾讯地图 Key 已准备，并已配置允许域名
 - [ ] DeepSeek Key（可选）已准备
 - [ ] 服务器为 Ubuntu 24.04 LTS，具备 sudo 权限
-- [ ] 代码目录已放置到 `/opt/Wechar_Develop`
+- [ ] 代码目录已放置到服务器上的项目根目录（例如 `/opt/wechat_work`）
 
 ## 2. 一键部署命令（按顺序执行）
 
-在服务器执行以下命令：
+在服务器执行以下命令。以下示例先将项目根目录写入变量，后续统一使用相对路径：
 
 ```bash
 set -e
+
+# 0) 进入项目根目录（示例路径请按实际情况替换）
+PROJECT_ROOT=/opt/wechat_work
+cd "$PROJECT_ROOT"
 
 # 1) 安装系统依赖
 sudo apt update
 sudo apt install -y nginx python3 python3-venv python3-pip
 
 # 2) 安装后端依赖
-cd /opt/Wechar_Develop/feature2-ai/backend
+cd app/backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
 # 3) 写入环境变量文件（按需改值）
-cat > /opt/Wechar_Develop/feature2-ai/backend/.env << 'EOF'
+cat > .env << 'EOF'
 FLASK_ENV=development
 PORT=5000
 WECHAT_TOKEN=replace_with_your_token
@@ -54,9 +58,9 @@ After=network.target
 [Service]
 User=www-data
 Group=www-data
-WorkingDirectory=/opt/Wechar_Develop/feature2-ai/backend
-EnvironmentFile=/opt/Wechar_Develop/feature2-ai/backend/.env
-ExecStart=/opt/Wechar_Develop/feature2-ai/backend/.venv/bin/gunicorn -w 2 -b 127.0.0.1:5000 app:app
+WorkingDirectory=/opt/wechat_work/app/backend
+EnvironmentFile=/opt/wechat_work/app/backend/.env
+ExecStart=/opt/wechat_work/app/backend/.venv/bin/gunicorn -w 2 -b 127.0.0.1:5000 app:app
 Restart=always
 RestartSec=5
 
@@ -68,20 +72,29 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now wechat-assistant
 
 # 5) 配置 Nginx（先确保你已把证书路径改成真实值）
-sudo cp /opt/Wechar_Develop/deploy/nginx/wechat_assistant.conf /etc/nginx/sites-available/wechat_assistant.conf
+cd "$PROJECT_ROOT"
+sudo cp deploy/nginx/wechat_assistant.conf /etc/nginx/sites-available/wechat_assistant.conf
 sudo ln -sf /etc/nginx/sites-available/wechat_assistant.conf /etc/nginx/sites-enabled/wechat_assistant.conf
 sudo nginx -t
 sudo systemctl restart nginx
 ```
 
+其中，systemd 服务中的绝对路径需要替换为你自己的项目根目录，例如：
+
+```ini
+WorkingDirectory=/opt/wechat_work/app/backend
+EnvironmentFile=/opt/wechat_work/app/backend/.env
+ExecStart=/opt/wechat_work/app/backend/.venv/bin/gunicorn -w 2 -b 127.0.0.1:5000 app:app
+```
+
 ## 3. 必改项（不改会失败）
 
-- `feature1-place/index.html` 中 `__TENCENT_MAP_KEY__` 替换为你的腾讯地图 Key
+- `app/web/place.html` 中 `__TENCENT_MAP_KEY__` 替换为你的腾讯地图 Key
 - `/etc/nginx/sites-available/wechat_assistant.conf` 中：
   - `server_name example.com` 改为你的域名
   - `ssl_certificate` 改为真实证书路径
   - `ssl_certificate_key` 改为真实私钥路径
-- `/opt/Wechar_Develop/feature2-ai/backend/.env` 中：
+- `app/backend/.env` 中：
   - `WECHAT_TOKEN` 必须与公众号后台一致
   - `DEEPSEEK_API_KEY` 填真实值
   - `KB_FORCE_LEXICAL=0` 为 HuggingFace + FAISS 模式；网络异常时改 `1` 回退词法模式

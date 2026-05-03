@@ -9,10 +9,11 @@ sudo apt update
 sudo apt install -y python3 python3-venv python3-pip
 ```
 
-2. 进入后端目录并安装依赖：
+2. 进入项目根目录后，再进入后端目录并安装依赖：
 
 ```bash
-cd /opt/Wechar_Develop/feature2-ai/backend
+cd /opt/wechat_work
+cd app/backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -22,6 +23,8 @@ pip install -r requirements.txt
 
 新建文件 `/etc/systemd/system/wechat-assistant.service`：
 
+将下面示例里的 `/opt/wechat_work` 替换成你自己的项目根目录绝对路径。
+
 ```ini
 [Unit]
 Description=Wechat Assistant Backend (Gunicorn)
@@ -30,14 +33,14 @@ After=network.target
 [Service]
 User=www-data
 Group=www-data
-WorkingDirectory=/opt/Wechar_Develop/feature2-ai/backend
+WorkingDirectory=/opt/wechat_work/app/backend
 Environment="WECHAT_TOKEN=replace_with_your_token"
 Environment="DEEPSEEK_BASE_URL=https://api.deepseek.com"
 Environment="DEEPSEEK_API_KEY=replace_with_your_api_key"
 Environment="DEEPSEEK_MODEL=deepseek-chat"
 Environment="OPENAI_TIMEOUT=15"
 Environment="KB_FORCE_LEXICAL=0"
-ExecStart=/opt/Wechar_Develop/feature2-ai/backend/.venv/bin/gunicorn -w 2 -b 127.0.0.1:5000 app:app
+ExecStart=/opt/wechat_work/app/backend/.venv/bin/gunicorn -w 2 -b 127.0.0.1:5000 app:app
 Restart=always
 RestartSec=5
 
