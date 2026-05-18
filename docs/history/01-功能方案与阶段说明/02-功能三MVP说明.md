@@ -41,5 +41,5 @@
 ## 7. 快速自检脚本
 
 ```powershell
-.venv\Scripts\python feature3_smoke_test.py
+.venv\Scripts\python .\tests\feature3_smoke_test.py
 ```

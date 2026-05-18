@@ -1,8 +1,14 @@
-import os
+import sys
 import time
+from pathlib import Path
+
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
 
 from app import app
-from auth import PERM_ANSWER, build_owner_identity
+from modules.auth.service import PERM_ANSWER, build_owner_identity
 
 
 def set_session_user(client, student_code: str, name: str, permissions: int) -> None:

@@ -1,29 +1,23 @@
-# Ubuntu 24.04 LTS：使用 systemd 将后端注册为服务
+# systemd 服务说明
 
-## 1. 准备运行环境
+本文件用于说明如何把当前项目的 Gunicorn 进程注册为 Linux systemd 服务。
 
-1. 安装 Python 与基础工具：
+## 1. 前提条件
 
-```bash
-sudo apt update
-sudo apt install -y python3 python3-venv python3-pip
+- 项目已部署到服务器，例如 `/opt/wechat_work`
+- 已在 `app/backend` 下创建虚拟环境并安装依赖
+- `.env` 已按实际环境配置完成
+- Gunicorn 已能手动启动成功
+
+## 2. 推荐服务文件
+
+创建：
+
+```text
+/etc/systemd/system/wechat-assistant.service
 ```
 
-2. 进入项目根目录后，再进入后端目录并安装依赖：
-
-```bash
-cd /opt/wechat_work
-cd app/backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-## 2. 创建 systemd 服务
-
-新建文件 `/etc/systemd/system/wechat-assistant.service`：
-
-将下面示例里的 `/opt/wechat_work` 替换成你自己的项目根目录绝对路径。
+示例内容：
 
 ```ini
 [Unit]
@@ -34,12 +28,7 @@ After=network.target
 User=www-data
 Group=www-data
 WorkingDirectory=/opt/wechat_work/app/backend
-Environment="WECHAT_TOKEN=replace_with_your_token"
-Environment="DEEPSEEK_BASE_URL=https://api.deepseek.com"
-Environment="DEEPSEEK_API_KEY=replace_with_your_api_key"
-Environment="DEEPSEEK_MODEL=deepseek-chat"
-Environment="OPENAI_TIMEOUT=15"
-Environment="KB_FORCE_LEXICAL=0"
+EnvironmentFile=/opt/wechat_work/app/backend/.env
 ExecStart=/opt/wechat_work/app/backend/.venv/bin/gunicorn -w 2 -b 127.0.0.1:5000 app:app
 Restart=always
 RestartSec=5
@@ -48,14 +37,42 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-## 3. 启动与开机自启
+## 3. 配置说明
+
+### `WorkingDirectory`
+
+必须指向：
+
+```text
+/opt/wechat_work/app/backend
+```
+
+原因：
+
+- 后端需要从该目录读取 `.env`
+- 相对路径运行文件基于 backend 根目录
+- tests 和运行期文件都以该目录为基准
+
+### `EnvironmentFile`
+
+推荐直接指向 backend 下的 `.env`，避免把密钥硬编码在服务文件里。
+
+### `ExecStart`
+
+推荐显式写绝对路径，避免环境歧义：
+
+```text
+/opt/wechat_work/app/backend/.venv/bin/gunicorn -w 2 -b 127.0.0.1:5000 app:app
+```
+
+## 4. 启用服务
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now wechat-assistant
 ```
 
-## 4. 常用维护命令
+## 5. 常用命令
 
 ```bash
 sudo systemctl status wechat-assistant
@@ -64,21 +81,42 @@ sudo systemctl stop wechat-assistant
 sudo journalctl -u wechat-assistant -f
 ```
 
-## 5. 验证
+## 6. 修改后生效流程
 
-浏览器访问：
-
-- `https://你的域名/`
-- `https://你的域名/chat`
-- `https://你的域名/place`
-
-接口验证：
+如果你修改了服务文件：
 
 ```bash
-curl -X POST 'https://你的域名/api/rebuild_index'
-curl 'https://你的域名/api/demo_status'
+sudo systemctl daemon-reload
+sudo systemctl restart wechat-assistant
 ```
 
-预期：
-- `kb_index_ready=true`
-- 当 `KB_FORCE_LEXICAL=0` 且网络正常时，`kb_backend=faiss`
+如果你只是修改了代码或 `.env`：
+
+```bash
+sudo systemctl restart wechat-assistant
+```
+
+## 7. 常见问题
+
+### 服务启动失败
+
+优先检查：
+
+- `WorkingDirectory` 是否正确
+- `.venv` 是否存在
+- `.env` 是否存在
+- `ExecStart` 路径是否正确
+- `www-data` 是否对 backend 目录有读写权限
+
+### 启动了但页面 502
+
+优先检查：
+
+- systemd 服务是否实际监听 5000
+- Nginx `proxy_pass` 是否指向相同地址
+- Gunicorn 是否因为导入错误启动后立即退出
+
+## 8. 推荐搭配文档
+
+- `docs/deployment/Linux生产部署手册.md`
+- `deploy/nginx/README.md`

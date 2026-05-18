@@ -5,8 +5,9 @@ from pathlib import Path
 from typing import Dict
 
 import requests
+from modules.shared.paths import BACKEND_ROOT
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = BACKEND_ROOT
 CACHE_FILE = BASE_DIR / "wechat_token_cache.json"
 
 WECHAT_APPID = os.getenv("WECHAT_APPID", "")

@@ -1,12 +1,14 @@
 import json
 import os
-import secrets
 import sqlite3
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-BASE_DIR = Path(__file__).resolve().parent
+from modules.shared.id_utils import generate_view_code
+from modules.shared.paths import BACKEND_ROOT
+
+BASE_DIR = BACKEND_ROOT
 _DB_PATH = Path(os.getenv("DB_PATH", str(BASE_DIR / "feature3.db")))
 
 
@@ -138,7 +140,7 @@ def create_question(
     view_code: Optional[str] = None,
 ) -> Dict[str, Any]:
     now = _now_ts()
-    safe_view_code = view_code or secrets.token_hex(4).upper()
+    safe_view_code = view_code or generate_view_code()
     with _connect() as conn:
         cur = conn.execute(
             """

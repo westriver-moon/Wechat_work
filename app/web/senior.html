@@ -210,28 +210,17 @@
     </section>
   </main>
 
+  <script src="/common.js"></script>
   <script>
     let currentQuery = '';
 
-    function esc(text) {
-      return (text || '').replace(/[&<>"']/g, (s) => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-      }[s]));
-    }
+    const esc = window.AppCommon.escapeHtml;
 
     function getSearchQuery() {
       return (document.getElementById('searchInput').value || '').trim();
     }
 
-    function fmtTs(v) {
-      const n = Number(v || 0);
-      if (!n) return '-';
-      try {
-        return new Date(n * 1000).toLocaleString();
-      } catch (err) {
-        return String(v);
-      }
-    }
+    const fmtTs = window.AppCommon.formatUnixTimestamp;
 
     function pendingCard(item) {
       return `

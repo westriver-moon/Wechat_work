@@ -6,189 +6,954 @@
   <title>新生智能问答助手</title>
   <style>
     :root {
-      --bg: #f7f8f5;
-      --paper: #fffdf8;
-      --ink: #1a2f26;
-      --muted: #5f746a;
-      --accent: #1f8a70;
-      --accent-2: #f4a261;
-      --line: #dde7e1;
-      --shadow: 0 10px 28px rgba(31, 138, 112, 0.15);
+      --bg: #f3efe6;
+      --surface: rgba(255, 251, 244, 0.78);
+      --surface-strong: #fffaf2;
+      --surface-dark: #18352b;
+      --ink: #1c2a24;
+      --muted: #6b766d;
+      --line: rgba(55, 77, 67, 0.14);
+      --emerald: #195f4a;
+      --emerald-soft: #d8ede5;
+      --amber: #c97728;
+      --amber-soft: #f5e2cc;
+      --rose-soft: #f4dfd8;
+      --shadow-lg: 0 28px 60px rgba(29, 42, 36, 0.16);
+      --shadow-md: 0 14px 30px rgba(29, 42, 36, 0.1);
+      --radius-xl: 30px;
+      --radius-lg: 22px;
+      --radius-md: 16px;
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     body {
       margin: 0;
+      height: 100vh;
       min-height: 100vh;
-      display: grid;
-      place-items: center;
-      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      font-family: "Source Han Sans SC", "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
       color: var(--ink);
       background:
-        radial-gradient(circle at 5% 10%, rgba(31, 138, 112, 0.25), transparent 35%),
-        radial-gradient(circle at 95% 85%, rgba(244, 162, 97, 0.25), transparent 35%),
-        var(--bg);
-      padding: 16px;
-    }
-
-    .chat {
-      width: min(860px, 100%);
-      height: min(90vh, 760px);
-      background: var(--paper);
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      box-shadow: var(--shadow);
-      display: grid;
-      grid-template-rows: auto 1fr auto;
+        radial-gradient(circle at top left, rgba(25, 95, 74, 0.18), transparent 28%),
+        radial-gradient(circle at 88% 12%, rgba(201, 119, 40, 0.18), transparent 24%),
+        linear-gradient(180deg, #efe7db 0%, #f7f3ed 50%, #f4efe7 100%);
       overflow: hidden;
     }
 
-    .head {
-      padding: 14px 16px;
-      border-bottom: 1px solid var(--line);
-      background: linear-gradient(120deg, rgba(31, 138, 112, 0.12), rgba(244, 162, 97, 0.1));
+    a {
+      color: inherit;
     }
 
-    .head h1 {
+    .backdrop {
+      position: fixed;
+      border-radius: 999px;
+      filter: blur(12px);
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    .backdrop.one {
+      width: 360px;
+      height: 360px;
+      background: rgba(25, 95, 74, 0.22);
+      top: -80px;
+      left: -70px;
+    }
+
+    .backdrop.two {
+      width: 280px;
+      height: 280px;
+      background: rgba(201, 119, 40, 0.18);
+      right: 8%;
+      top: 18%;
+    }
+
+    .backdrop.three {
+      width: 420px;
+      height: 420px;
+      background: rgba(151, 174, 163, 0.18);
+      right: -120px;
+      bottom: -140px;
+    }
+
+    .app-shell {
+      position: relative;
+      z-index: 1;
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
+      gap: 20px;
+      padding: 22px;
+      overflow: hidden;
+    }
+
+    .rail,
+    .workspace {
+      min-height: 0;
+    }
+
+    .rail {
+      display: grid;
+      gap: 18px;
+      align-content: start;
+    }
+
+    .hero-card,
+    .panel,
+    .messages-panel,
+    .composer-card,
+    .topbar {
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      background: var(--surface);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      box-shadow: var(--shadow-md);
+    }
+
+    .hero-card {
+      padding: 28px;
+      border-radius: var(--radius-xl);
+      background:
+        linear-gradient(145deg, rgba(255, 250, 242, 0.95), rgba(240, 248, 244, 0.78)),
+        var(--surface);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-card::after {
+      content: "";
+      position: absolute;
+      inset: auto -70px -90px auto;
+      width: 220px;
+      height: 220px;
+      background: radial-gradient(circle, rgba(25, 95, 74, 0.18), transparent 70%);
+      border-radius: 999px;
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      letter-spacing: 0.18em;
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--emerald);
+    }
+
+    .hero-card h1 {
       margin: 0;
-      font-size: 18px;
+      font-size: 34px;
+      line-height: 1.06;
+      font-family: "STZhongsong", "Songti SC", serif;
     }
 
-    .head p {
+    .hero-copy {
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+      max-width: 24em;
+    }
+
+    .badge-row,
+    .topbar-nav,
+    .prompt-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .badge-row {
+      margin-top: 18px;
+    }
+
+    .badge,
+    .panel-tag,
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .badge {
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(56, 74, 66, 0.12);
+      color: #294136;
+    }
+
+    .badge-primary,
+    .status-pill.is-active {
+      background: linear-gradient(135deg, #1f7158, #154c3d);
+      color: #fff;
+      border: none;
+      box-shadow: 0 10px 24px rgba(25, 95, 74, 0.24);
+    }
+
+    .status-pill.is-warn {
+      background: linear-gradient(135deg, #c97728, #a45916);
+      color: #fff;
+      border: none;
+    }
+
+    .status-pill.is-idle,
+    .panel-tag {
+      background: rgba(25, 95, 74, 0.08);
+      color: var(--emerald);
+      border: 1px solid rgba(25, 95, 74, 0.1);
+    }
+
+    .metric-grid {
+      margin-top: 22px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .metric-card {
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.74);
+      border: 1px solid rgba(62, 79, 71, 0.1);
+    }
+
+    .metric-label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .metric-card strong {
+      font-size: 18px;
+      line-height: 1.2;
+    }
+
+    .panel {
+      border-radius: var(--radius-lg);
+      padding: 20px;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .panel-head h2,
+    .panel-head h3 {
+      margin: 0;
+      font-size: 17px;
+    }
+
+    .prompt-chip {
+      appearance: none;
+      border: 1px solid rgba(25, 95, 74, 0.14);
+      background: rgba(255, 255, 255, 0.84);
+      color: #284136;
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    }
+
+    .prompt-chip:hover {
+      transform: translateY(-1px);
+      border-color: rgba(25, 95, 74, 0.32);
+      box-shadow: 0 12px 24px rgba(25, 95, 74, 0.12);
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: 18px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .topbar {
+      border-radius: 26px;
+      padding: 18px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .topbar-title {
+      margin: 0;
+      font-size: 22px;
+      font-family: "STZhongsong", "Songti SC", serif;
+    }
+
+    .topbar-copy {
       margin: 6px 0 0;
       color: var(--muted);
       font-size: 13px;
     }
 
-    .head-nav {
-      margin-top: 10px;
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
+    .top-link {
+      text-decoration: none;
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.86);
+      border: 1px solid rgba(56, 74, 66, 0.12);
+      font-size: 12px;
+      font-weight: 800;
+      color: #254035;
     }
 
-    .head-link {
-      text-decoration: none;
-      font-size: 12px;
-      color: #0d3b2f;
-      background: #e8f4ef;
-      border: 1px solid #c6ddd4;
-      border-radius: 999px;
-      padding: 5px 10px;
-      font-weight: 700;
+    .conversation {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 18px;
+      overflow: hidden;
+    }
+
+    .messages-panel {
+      border-radius: var(--radius-xl);
+      padding: 18px;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      min-height: 0;
+      overflow: hidden;
     }
 
     .messages {
-      padding: 14px;
+      min-height: 0;
       overflow: auto;
+      padding-right: 4px;
+      display: grid;
+      gap: 14px;
+      align-content: start;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .messages::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .messages::-webkit-scrollbar-thumb {
+      background: rgba(25, 95, 74, 0.2);
+      border-radius: 999px;
+    }
+
+    .empty-state {
+      border-radius: 24px;
+      padding: 28px;
+      border: 1px dashed rgba(25, 95, 74, 0.22);
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(236, 246, 241, 0.7));
+      min-height: 220px;
+      display: grid;
+      align-content: center;
+      gap: 12px;
+    }
+
+    .empty-kicker {
+      margin: 0;
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      color: var(--emerald);
+      font-weight: 800;
+    }
+
+    .empty-state h3 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.2;
+      font-family: "STZhongsong", "Songti SC", serif;
+      max-width: 12em;
+    }
+
+    .empty-state p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .msg {
+      display: grid;
+      gap: 10px;
+      max-width: min(760px, 88%);
+      animation: rise 0.22s ease;
+    }
+
+    .msg.user {
+      justify-self: end;
+    }
+
+    .msg.bot {
+      justify-self: start;
+    }
+
+    .msg-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .avatar {
+      width: 34px;
+      height: 34px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 12px;
+      font-weight: 800;
+      color: #fff;
+      background: linear-gradient(135deg, #1f7158, #164739);
+      box-shadow: 0 10px 22px rgba(25, 95, 74, 0.18);
+    }
+
+    .msg.user .avatar {
+      background: linear-gradient(135deg, #c97728, #a15f20);
+      box-shadow: 0 10px 22px rgba(201, 119, 40, 0.18);
+    }
+
+    .msg-meta-copy {
+      display: grid;
+      gap: 2px;
+    }
+
+    .msg-meta-copy strong {
+      color: var(--ink);
+      font-size: 13px;
+    }
+
+    .msg-body {
+      padding: 18px 18px 16px;
+      border-radius: 22px;
+      white-space: pre-wrap;
+      line-height: 1.7;
+      box-shadow: var(--shadow-md);
+      border: 1px solid rgba(56, 74, 66, 0.08);
+    }
+
+    .msg.user .msg-body {
+      background: linear-gradient(135deg, #fff2e2, #ffe7cb);
+      color: #4d3215;
+    }
+
+    .msg.bot .msg-body {
+      background: rgba(255, 255, 255, 0.88);
+    }
+
+    .msg-body p {
+      margin: 0 0 10px;
+    }
+
+    .msg-body p:last-child {
+      margin-bottom: 0;
+    }
+
+    .msg-body h1,
+    .msg-body h2,
+    .msg-body h3,
+    .msg-body h4 {
+      margin: 12px 0 8px;
+      line-height: 1.35;
+    }
+
+    .msg-body ul,
+    .msg-body ol {
+      margin: 6px 0 10px 20px;
+      padding: 0;
+    }
+
+    .msg-body li {
+      margin: 4px 0;
+    }
+
+    .msg-body blockquote {
+      margin: 10px 0;
+      padding: 8px 12px;
+      border-left: 3px solid rgba(25, 95, 74, 0.36);
+      background: rgba(25, 95, 74, 0.05);
+      color: #33453d;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .msg-body code {
+      font-family: "JetBrains Mono", "Consolas", monospace;
+      background: rgba(25, 95, 74, 0.08);
+      border: 1px solid rgba(25, 95, 74, 0.08);
+      border-radius: 7px;
+      padding: 1px 5px;
+      font-size: 13px;
+    }
+
+    .msg-body pre {
+      margin: 10px 0;
+      padding: 12px;
+      border-radius: 14px;
+      background: #eef5f1;
+      overflow: auto;
+    }
+
+    .msg-body pre code {
+      padding: 0;
+      border: none;
+      background: none;
+    }
+
+    .msg-body a {
+      color: #0f6951;
+      font-weight: 700;
+    }
+
+    .composer-shell {
+      padding-bottom: 2px;
+    }
+
+    .composer-card {
+      border-radius: var(--radius-xl);
+      padding: 20px;
+    }
+
+    .field-label {
+      display: inline-block;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    textarea {
+      width: 100%;
+      border: 1px solid rgba(56, 74, 66, 0.12);
+      border-radius: 18px;
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, 0.92);
+      color: var(--ink);
+      outline: none;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+      font-size: 15px;
+      font-family: inherit;
+    }
+
+    textarea {
+      min-height: 118px;
+      max-height: 220px;
+      resize: none;
+      line-height: 1.7;
+    }
+
+    textarea:focus {
+      border-color: rgba(25, 95, 74, 0.42);
+      box-shadow: 0 0 0 4px rgba(25, 95, 74, 0.1);
+      transform: translateY(-1px);
+    }
+
+    .field-stack {
       display: grid;
       gap: 10px;
       align-content: start;
     }
 
-    .msg {
-      max-width: 78%;
-      padding: 10px 12px;
-      border-radius: 12px;
-      white-space: pre-wrap;
-      line-height: 1.6;
-      animation: pop 0.18s ease;
-    }
-
-    .msg.user {
-      justify-self: end;
-      background: #d4efe5;
-      border: 1px solid #bfdfd3;
-    }
-
-    .msg.bot {
-      justify-self: start;
-      background: #fff;
-      border: 1px solid var(--line);
-    }
-
-    .composer {
-      border-top: 1px solid var(--line);
-      padding: 12px;
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 8px;
-      background: #fff;
-    }
-
-    textarea {
-      resize: none;
-      min-height: 44px;
-      max-height: 140px;
-      border: 1px solid #cddad2;
-      border-radius: 10px;
-      padding: 10px;
-      font-size: 15px;
-      font-family: inherit;
-      outline: none;
-    }
-
-    textarea:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(31, 138, 112, 0.15);
-    }
-
-    button {
-      border: none;
-      border-radius: 10px;
-      padding: 0 16px;
+    .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      border-radius: 14px;
+      padding: 11px 12px;
+      background: rgba(25, 95, 74, 0.07);
+      color: #264237;
+      font-size: 13px;
       font-weight: 700;
-      color: #fff;
-      background: linear-gradient(120deg, var(--accent), #2aa889);
       cursor: pointer;
     }
 
-    @keyframes pop {
-      from { transform: translateY(6px); opacity: 0.6; }
-      to { transform: translateY(0); opacity: 1; }
+    .toggle input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--emerald);
     }
 
-    @media (max-width: 640px) {
-      .chat { height: 92vh; }
-      .msg { max-width: 90%; }
-      .composer { grid-template-columns: 1fr; }
-      button { min-height: 42px; }
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    .composer-actions {
+      margin-top: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .send-btn {
+      appearance: none;
+      border: none;
+      border-radius: 18px;
+      padding: 14px 18px;
+      min-width: 146px;
+      background: linear-gradient(135deg, #1d7259, #133f33);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 16px 32px rgba(25, 95, 74, 0.26);
+      transition: transform 0.18s ease, opacity 0.18s ease;
+    }
+
+    .send-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+    }
+
+    .send-btn:disabled {
+      cursor: wait;
+      opacity: 0.72;
+    }
+
+    @keyframes rise {
+      from {
+        transform: translateY(8px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    @media (max-width: 1240px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+        overflow: auto;
+      }
+
+      .conversation {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
+      body {
+        overflow: auto;
+      }
+
+      .app-shell {
+        padding: 14px;
+        gap: 14px;
+      }
+
+      .hero-card,
+      .panel,
+      .messages-panel,
+      .composer-card,
+      .topbar {
+        border-radius: 22px;
+      }
+
+      .hero-card h1,
+      .empty-state h3 {
+        font-size: 28px;
+      }
+
+      .topbar {
+        display: grid;
+        justify-content: stretch;
+      }
+
+      .composer-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .msg {
+        max-width: 100%;
+      }
+
+      .topbar-nav {
+        gap: 8px;
+      }
     }
   </style>
 </head>
 <body>
-  <main class="chat">
-    <header class="head">
-      <h1>新生智能问答助手</h1>
-      <p>支持选课、宿舍、校园网、食堂、图书馆等问题咨询</p>
-      <div class="head-nav">
-        <a class="head-link" href="/">返回主页</a>
-        <a class="head-link" href="/place">进入地图查询</a>
-        <a class="head-link" href="/freshman">我的问题</a>
-        <a class="head-link" href="/logout">退出登录</a>
-      </div>
-    </header>
+  <div class="backdrop one"></div>
+  <div class="backdrop two"></div>
+  <div class="backdrop three"></div>
 
-    <section id="messages" class="messages"></section>
+  <main class="app-shell">
+    <aside class="rail">
+      <section class="hero-card">
+        <p class="eyebrow">BIT FRESHMAN AI DESK</p>
+        <h1>北理工新生助手</h1>
+        <p class="hero-copy">输入问题后，系统会整理相关信息并生成最终回答。</p>
+        <div class="badge-row">
+          <span id="modeBadge" class="badge badge-primary">等待提问</span>
+          <span class="badge">校园问答</span>
+        </div>
+      </section>
 
-    <section class="composer">
-      <textarea id="input" placeholder="请输入你的问题... (Enter 发送 / Shift+Enter 换行)"></textarea>
-      <button id="sendBtn" type="button">发送</button>
+      <section class="panel">
+        <div class="panel-head">
+          <h2>快速提问</h2>
+          <span class="panel-tag">示例</span>
+        </div>
+        <div class="prompt-grid">
+          <button class="prompt-chip" type="button" data-prompt="北理工奖学金主要类型和申请建议有哪些？">奖学金申请</button>
+          <button class="prompt-chip" type="button" data-prompt="报到当天需要准备哪些材料？">报到材料</button>
+          <button class="prompt-chip" type="button" data-prompt="宿舍和校园网开通流程是什么？">宿舍与校园网</button>
+          <button class="prompt-chip" type="button" data-prompt="研究生院有哪些新生相关通知入口？">研究生通知入口</button>
+        </div>
+      </section>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <div>
+          <h2 class="topbar-title">AI 问答</h2>
+          <p class="topbar-copy">直接提问即可，系统会整理可用信息并给出回答。</p>
+        </div>
+        <nav class="topbar-nav">
+          <a class="top-link" href="/">返回主页</a>
+          <a class="top-link" href="/place">地图查询</a>
+          <a class="top-link" href="/freshman">我的问题</a>
+          <a class="top-link" href="/logout">退出登录</a>
+        </nav>
+      </header>
+
+      <section class="conversation">
+        <section class="messages-panel">
+          <div class="panel-head">
+            <div>
+              <h2>对话区</h2>
+              <p id="strategyNote" class="topbar-copy">提问后会整理相关信息并生成回答。</p>
+            </div>
+            <span id="statusPill" class="status-pill is-idle">待命</span>
+          </div>
+          <section id="messages" class="messages">
+            <div id="emptyState" class="empty-state">
+              <p class="empty-kicker">START HERE</p>
+              <h3>直接提问即可，我会整理相关信息并给出回答。</h3>
+              <p>页面只显示最终回答；新消息会自动滚动到底部。</p>
+            </div>
+          </section>
+        </section>
+      </section>
+
+      <section class="composer-shell">
+        <div class="composer-card">
+          <label class="field-label" for="input">你的问题</label>
+          <textarea id="input" placeholder="例如：北京理工大学奖学金申请条件有哪些？按 Enter 发送，Shift+Enter 换行。"></textarea>
+          <div class="composer-actions">
+            <span class="hint">支持直接提问；回答中会保留最终引用到的链接。</span>
+            <button id="sendBtn" class="send-btn" type="button">发送问题</button>
+          </div>
+        </div>
+      </section>
     </section>
   </main>
 
+  <script src="/common.js"></script>
   <script>
     const messagesEl = document.getElementById('messages');
+    const emptyStateEl = document.getElementById('emptyState');
     const inputEl = document.getElementById('input');
     const sendBtn = document.getElementById('sendBtn');
+    const modeBadgeEl = document.getElementById('modeBadge');
+    const statusPillEl = document.getElementById('statusPill');
+    const strategyNoteEl = document.getElementById('strategyNote');
+
+    const escapeHtml = window.AppCommon.escapeHtml;
+
+    function formatTime(date = new Date()) {
+      return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function renderInlineMarkdown(raw) {
+      let html = escapeHtml(raw);
+      html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+      html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+      html = html.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+      html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+      return html;
+    }
+
+    function renderMarkdown(text) {
+      const normalized = String(text || '').replace(/\r\n/g, '\n');
+      const lines = normalized.split('\n');
+      const htmlParts = [];
+      let inCodeBlock = false;
+      let inUl = false;
+      let inOl = false;
+
+      function closeLists() {
+        if (inUl) {
+          htmlParts.push('</ul>');
+          inUl = false;
+        }
+        if (inOl) {
+          htmlParts.push('</ol>');
+          inOl = false;
+        }
+      }
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+
+        if (/^```/.test(trimmed)) {
+          closeLists();
+          if (!inCodeBlock) {
+            htmlParts.push('<pre><code>');
+            inCodeBlock = true;
+          } else {
+            htmlParts.push('</code></pre>');
+            inCodeBlock = false;
+          }
+          continue;
+        }
+
+        if (inCodeBlock) {
+          htmlParts.push(`${escapeHtml(line)}\n`);
+          continue;
+        }
+
+        if (!trimmed) {
+          closeLists();
+          continue;
+        }
+
+        const headingMatch = trimmed.match(/^(#{1,4})\s+(.+)$/);
+        if (headingMatch) {
+          closeLists();
+          const level = headingMatch[1].length;
+          htmlParts.push(`<h${level}>${renderInlineMarkdown(headingMatch[2])}</h${level}>`);
+          continue;
+        }
+
+        const quoteMatch = trimmed.match(/^>\s?(.+)$/);
+        if (quoteMatch) {
+          closeLists();
+          htmlParts.push(`<blockquote>${renderInlineMarkdown(quoteMatch[1])}</blockquote>`);
+          continue;
+        }
+
+        const ulMatch = trimmed.match(/^[-*]\s+(.+)$/);
+        if (ulMatch) {
+          if (inOl) {
+            htmlParts.push('</ol>');
+            inOl = false;
+          }
+          if (!inUl) {
+            htmlParts.push('<ul>');
+            inUl = true;
+          }
+          htmlParts.push(`<li>${renderInlineMarkdown(ulMatch[1])}</li>`);
+          continue;
+        }
+
+        const olMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+        if (olMatch) {
+          if (inUl) {
+            htmlParts.push('</ul>');
+            inUl = false;
+          }
+          if (!inOl) {
+            htmlParts.push('<ol>');
+            inOl = true;
+          }
+          htmlParts.push(`<li>${renderInlineMarkdown(olMatch[1])}</li>`);
+          continue;
+        }
+
+        closeLists();
+        htmlParts.push(`<p>${renderInlineMarkdown(trimmed)}</p>`);
+      }
+
+      closeLists();
+      if (inCodeBlock) {
+        htmlParts.push('</code></pre>');
+      }
+      return htmlParts.join('');
+    }
+
+    function hideEmptyState() {
+      if (emptyStateEl) {
+        emptyStateEl.style.display = 'none';
+      }
+    }
+
+    function scrollMessagesToBottom() {
+      requestAnimationFrame(() => {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      });
+    }
+
+    function setStatus(kind, note) {
+      const map = {
+        idle: { badge: '等待提问', pill: '待命', className: 'is-idle' },
+        loading: { badge: '正在整理', pill: '处理中', className: 'is-active' },
+        web: { badge: '回答已生成', pill: '已完成', className: 'is-active' },
+        kb: { badge: '回答已生成', pill: '已完成', className: 'is-idle' },
+        error: { badge: '请求失败', pill: '失败', className: 'is-warn' }
+      };
+      const state = map[kind] || map.idle;
+      modeBadgeEl.textContent = state.badge;
+      statusPillEl.textContent = state.pill;
+      statusPillEl.className = `status-pill ${state.className}`;
+      strategyNoteEl.textContent = note || '提问后会整理相关信息并生成回答。';
+    }
 
     function addMessage(role, text) {
-      const div = document.createElement('div');
-      div.className = `msg ${role}`;
-      div.textContent = text;
-      messagesEl.appendChild(div);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
+      hideEmptyState();
+      const article = document.createElement('article');
+      article.className = `msg ${role}`;
+
+      const label = role === 'user' ? '你的问题' : '助手回答';
+      const avatar = role === 'user' ? '我' : 'AI';
+      article.innerHTML = `
+        <div class="msg-meta">
+          <span class="avatar">${avatar}</span>
+          <div class="msg-meta-copy">
+            <strong>${label}</strong>
+            <span>${formatTime()}</span>
+          </div>
+        </div>
+        <div class="msg-body"></div>
+      `;
+      setMessageContent(article, role, text);
+      messagesEl.appendChild(article);
+      scrollMessagesToBottom();
+      return article;
+    }
+
+    function setMessageContent(el, role, text) {
+      const body = el.querySelector('.msg-body');
+      if (!body) {
+        return;
+      }
+      if (role === 'bot') {
+        body.innerHTML = renderMarkdown(text);
+      } else {
+        body.textContent = text;
+      }
+      scrollMessagesToBottom();
+    }
+
+    function setLoadingState(loading) {
+      sendBtn.disabled = loading;
+      sendBtn.textContent = loading ? '处理中...' : '发送问题';
     }
 
     async function sendMessage() {
@@ -197,7 +962,9 @@
 
       addMessage('user', question);
       inputEl.value = '';
-      sendBtn.disabled = true;
+      inputEl.style.height = '';
+      setLoadingState(true);
+      setStatus('loading', '正在整理回答，请稍候。');
 
       try {
         const res = await fetch('/api/chat', {
@@ -211,23 +978,42 @@
         }
 
         const data = await res.json();
+        setStatus(
+          data.mode === 'kb' ? 'kb' : 'web',
+          '已生成回答。'
+        );
         addMessage('bot', data.answer || '抱歉，暂时无法回答这个问题。');
       } catch (err) {
+        setStatus('error', '本轮请求失败，未能完成搜索或生成。');
         addMessage('bot', '网络异常，请稍后再试。');
       } finally {
-        sendBtn.disabled = false;
+        setLoadingState(false);
       }
     }
 
     sendBtn.addEventListener('click', sendMessage);
-    inputEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
+
+    inputEl.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
         sendMessage();
       }
     });
 
-    addMessage('bot', '你好，我是新生助手。你可以直接输入问题进行问答。');
+    inputEl.addEventListener('input', () => {
+      inputEl.style.height = 'auto';
+      inputEl.style.height = `${Math.min(inputEl.scrollHeight, 220)}px`;
+    });
+
+    document.querySelectorAll('.prompt-chip').forEach((button) => {
+      button.addEventListener('click', () => {
+        inputEl.value = button.dataset.prompt || '';
+        inputEl.dispatchEvent(new Event('input'));
+        inputEl.focus();
+      });
+    });
+
+    setStatus('idle', '提问后会整理相关信息并生成回答。');
   </script>
 </body>
 </html>

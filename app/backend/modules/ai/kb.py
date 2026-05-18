@@ -1,10 +1,14 @@
 import json
 import os
+import re
+import threading
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
 import requests
+from modules.shared.paths import BACKEND_ROOT, DATA_ROOT
+from modules.shared.text_utils import lexical_score, normalize_text
 
 try:
     from sentence_transformers import SentenceTransformer
@@ -17,7 +21,7 @@ except Exception:
     faiss = None
 
 # Files stored alongside backend
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = BACKEND_ROOT
 INDEX_PATH = BASE_DIR / "kb_index.faiss"
 META_PATH = BASE_DIR / "kb_meta.json"
 TEXTS_PATH = BASE_DIR / "kb_texts.json"
@@ -25,51 +29,127 @@ STATE_PATH = BASE_DIR / "kb_state.json"
 
 # Small model for embeddings; change as needed
 EMB_MODEL_NAME = "all-MiniLM-L6-v2"
+CHUNK_SIZE = max(240, int(os.getenv("KB_CHUNK_SIZE", "560")))
+CHUNK_OVERLAP = max(40, min(CHUNK_SIZE // 2, int(os.getenv("KB_CHUNK_OVERLAP", "140"))))
+LEXICAL_MIN_SCORE = max(0.0, float(os.getenv("KB_LEXICAL_MIN_SCORE", "0.05")))
+
+QUERY_EXPANSIONS = {
+    "选课": ["教务", "培养方案", "补退选", "教学日历"],
+    "课程": ["教务", "培养方案", "补退选", "教学日历"],
+    "转专业": ["学籍", "教务", "接收计划", "遴选办法"],
+    "转系": ["转专业", "学籍", "接收计划", "遴选办法"],
+    "宿舍": ["住宿", "入住", "宿管", "辅导员"],
+    "校园网": ["网络", "认证", "账号", "信息化"],
+    "网络": ["校园网", "认证", "账号", "信息化"],
+    "图书馆": ["借阅", "馆藏", "数据库", "座位预约"],
+    "奖学金": ["资助", "奖助", "申请", "评审"],
+    "助学金": ["资助", "奖助", "申请", "评审"],
+    "报到": ["迎新", "入学", "材料", "流程"],
+    "军训": ["国防教育", "训练", "安排"],
+    "医保": ["医疗", "健康", "报销", "门诊", "校医院"],
+    "报销": ["医保", "校医院", "票据", "转诊"],
+    "车辆": ["入校", "车证", "通行", "停车"],
+    "家长车": ["车辆", "入校", "迎新", "停车"],
+}
+
+
+def _split_with_overlap(text: str, chunk_size: int, overlap: int) -> List[str]:
+    text = (text or "").strip()
+    if not text:
+        return []
+    if len(text) <= chunk_size:
+        return [text]
+
+    step = max(1, chunk_size - overlap)
+    chunks = []
+    for start in range(0, len(text), step):
+        part = text[start : start + chunk_size].strip()
+        if len(part) < 24:
+            continue
+        chunks.append(part)
+        if start + chunk_size >= len(text):
+            break
+    return chunks
+
+
+def _iter_markdown_blocks(raw: str) -> List[str]:
+    blocks: List[str] = []
+    heading_stack: List[str] = []
+    paragraph: List[str] = []
+
+    def flush_paragraph() -> None:
+        if not paragraph:
+            return
+        title = " / ".join(heading_stack[-2:]).strip()
+        body = " ".join(paragraph).strip()
+        paragraph.clear()
+        if not body:
+            return
+        if title:
+            blocks.append(f"{title}\n{body}")
+        else:
+            blocks.append(body)
+
+    for line in (raw or "").replace("\r\n", "\n").split("\n"):
+        stripped = line.strip()
+        if not stripped:
+            flush_paragraph()
+            continue
+
+        heading_match = re.match(r"^(#{1,6})\s+(.+)$", stripped)
+        if heading_match:
+            flush_paragraph()
+            level = len(heading_match.group(1))
+            title = heading_match.group(2).strip()
+            heading_stack[:] = heading_stack[: level - 1]
+            heading_stack.append(title)
+            continue
+
+        paragraph.append(stripped)
+
+    flush_paragraph()
+    return blocks
+
+
+def _expand_query(query: str) -> str:
+    query = (query or "").strip()
+    if not query:
+        return ""
+
+    expanded_terms: List[str] = [query]
+    normalized = normalize_text(query)
+    for key, aliases in QUERY_EXPANSIONS.items():
+        if key in query or key in normalized:
+            expanded_terms.extend(aliases)
+
+    dedup = []
+    seen = set()
+    for term in expanded_terms:
+        token = term.strip()
+        if not token or token in seen:
+            continue
+        seen.add(token)
+        dedup.append(token)
+    return " ".join(dedup)
 
 
 def _load_texts_from_data(data_dir: Path) -> List[Dict]:
     texts = []
     for p in sorted((data_dir).glob("*.md")):
         raw = p.read_text(encoding="utf-8")
-        # simple fixed-size chunking; production should use tokenizer-aware chunking
-        chunk_size = 800
-        for i in range(0, len(raw), chunk_size):
-            chunk = raw[i : i + chunk_size].strip()
-            if not chunk:
-                continue
-            texts.append({"source": p.name, "chunk_id": i // chunk_size, "text": chunk})
+        blocks = _iter_markdown_blocks(raw)
+        chunk_id = 0
+        for block in blocks:
+            for chunk in _split_with_overlap(block, CHUNK_SIZE, CHUNK_OVERLAP):
+                texts.append({"source": p.name, "chunk_id": chunk_id, "text": chunk})
+                chunk_id += 1
+
+        # Empty markdown files or parsing failures should still degrade gracefully.
+        if not blocks:
+            for chunk in _split_with_overlap(raw, CHUNK_SIZE, CHUNK_OVERLAP):
+                texts.append({"source": p.name, "chunk_id": chunk_id, "text": chunk})
+                chunk_id += 1
     return texts
-
-
-def _normalize_text(text: str) -> str:
-    text = (text or "").strip().lower()
-    for p in "，。！？；：、,.!?;:()（）[]【】{}\n\t\r\"'“”‘’":
-        text = text.replace(p, " ")
-    return " ".join(text.split())
-
-
-def _char_ngrams(text: str, n: int = 2) -> set:
-    if len(text) < n:
-        return {text} if text else set()
-    return {text[i : i + n] for i in range(len(text) - n + 1)}
-
-
-def _lexical_score(query: str, content: str) -> float:
-    q = _normalize_text(query)
-    t = _normalize_text(content)
-    if not q or not t:
-        return 0.0
-
-    q2 = _char_ngrams(q, 2)
-    t2 = _char_ngrams(t, 2)
-    q1 = set(q)
-    t1 = set(t)
-
-    overlap2 = len(q2 & t2) / max(1, len(q2))
-    overlap1 = len(q1 & t1) / max(1, len(q1))
-    contain_bonus = 0.2 if q in t else 0.0
-
-    return float(min(1.0, 0.55 * overlap2 + 0.35 * overlap1 + contain_bonus))
 
 
 def _save_meta_and_texts(texts: List[Dict]):
@@ -111,7 +191,7 @@ def _load_state() -> Dict:
 
 
 def build_index(data_dir: Path = None, index_path: Path = None):
-    data_dir = data_dir or (BASE_DIR.parent / "data")
+    data_dir = data_dir or DATA_ROOT
     index_path = index_path or INDEX_PATH
 
     texts = _load_texts_from_data(data_dir)
@@ -207,14 +287,17 @@ def load_index(index_path: Path = None):
 
 
 _MODEL = None
+_MODEL_LOCK = threading.Lock()
 
 
 def _get_model():
     global _MODEL
     if _MODEL is None:
-        if SentenceTransformer is None:
-            raise RuntimeError("sentence-transformers unavailable")
-        _MODEL = SentenceTransformer(EMB_MODEL_NAME)
+        with _MODEL_LOCK:
+            if _MODEL is None:
+                if SentenceTransformer is None:
+                    raise RuntimeError("sentence-transformers unavailable")
+                _MODEL = SentenceTransformer(EMB_MODEL_NAME)
     return _MODEL
 
 
@@ -237,16 +320,35 @@ def index_status() -> Dict:
 
 
 def _query_lexical(query: str, metas: List[Dict], texts: List[str], k: int) -> List[Dict]:
+    expanded_query = _expand_query(query)
     scored = []
     for idx, text in enumerate(texts):
-        score = _lexical_score(query, text)
-        if score <= 0:
-            continue
+        score = lexical_score(expanded_query, text)
+        source = str((metas[idx] if idx < len(metas) else {}).get("source") or "")
+        if source and source.replace("_", "") in expanded_query:
+            score = min(1.0, score + 0.05)
         scored.append((score, idx))
     scored.sort(key=lambda x: x[0], reverse=True)
 
     results = []
-    for score, idx in scored[:k]:
+    for score, idx in scored:
+        if len(results) >= k:
+            break
+        if score < LEXICAL_MIN_SCORE and results:
+            break
+        meta = metas[idx] if idx < len(metas) else {}
+        results.append(
+            {
+                "score": float(score),
+                "source": meta.get("source") or "unknown.md",
+                "chunk_id": int(meta.get("chunk_id", 0)),
+                "text": texts[idx],
+            }
+        )
+
+    # Ensure at least one candidate is returned for downstream fallback synthesis.
+    if not results and scored:
+        score, idx = scored[0]
         meta = metas[idx] if idx < len(metas) else {}
         results.append(
             {
@@ -262,7 +364,13 @@ def _query_lexical(query: str, metas: List[Dict], texts: List[str], k: int) -> L
 def query_index(query: str, k: int = 3, index_path: Path = None):
     loaded = load_index(index_path=index_path)
     if not loaded:
-        return []
+        # In query path, avoid hidden writes and fall back to in-memory lexical retrieval.
+        texts = _load_texts_from_data(DATA_ROOT)
+        if not texts:
+            return []
+        metas = [{"source": t["source"], "chunk_id": t["chunk_id"]} for t in texts]
+        values = [t["text"] for t in texts]
+        return _query_lexical(query, metas, values, k)
 
     backend = loaded["backend"]
     metas = loaded["metas"]

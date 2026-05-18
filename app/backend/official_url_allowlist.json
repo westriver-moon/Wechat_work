@@ -1,0 +1,134 @@
+{
+  "generated_at": "2026-05-03",
+  "source": "Curated from BIT official homepage navigation and public official subdomains validated on 2026-05-03.",
+  "sites": [
+    {
+      "name": "学校官网",
+      "host": "www.bit.edu.cn",
+      "root_url": "https://www.bit.edu.cn/",
+      "category": "门户",
+      "verified": true,
+      "crawl_enabled": true
+    },
+    {
+      "name": "迎新网",
+      "host": "hi.bit.edu.cn",
+      "root_url": "https://hi.bit.edu.cn/",
+      "category": "新生服务",
+      "verified": false,
+      "crawl_enabled": true
+    },
+    {
+      "name": "本科招生网",
+      "host": "admission.bit.edu.cn",
+      "root_url": "https://admission.bit.edu.cn/",
+      "category": "招生",
+      "verified": true,
+      "crawl_enabled": true
+    },
+    {
+      "name": "研究生院",
+      "host": "grd.bit.edu.cn",
+      "root_url": "https://grd.bit.edu.cn/",
+      "category": "招生培养",
+      "verified": true,
+      "crawl_enabled": true
+    },
+    {
+      "name": "教务部",
+      "host": "jwc.bit.edu.cn",
+      "root_url": "https://jwc.bit.edu.cn/",
+      "category": "教学教务",
+      "verified": true,
+      "crawl_enabled": true
+    },
+    {
+      "name": "图书馆",
+      "host": "lib.bit.edu.cn",
+      "root_url": "https://lib.bit.edu.cn/",
+      "category": "学习资源",
+      "verified": true,
+      "crawl_enabled": true
+    },
+    {
+      "name": "就业信息网",
+      "host": "job.bit.edu.cn",
+      "root_url": "https://job.bit.edu.cn/",
+      "category": "就业",
+      "verified": true,
+      "crawl_enabled": true
+    },
+    {
+      "name": "英文站",
+      "host": "english.bit.edu.cn",
+      "root_url": "https://english.bit.edu.cn/",
+      "category": "国际化",
+      "verified": false,
+      "crawl_enabled": true
+    },
+    {
+      "name": "信息公开",
+      "host": "xxgk.bit.edu.cn",
+      "root_url": "https://xxgk.bit.edu.cn/",
+      "category": "校务公开",
+      "verified": false,
+      "crawl_enabled": true
+    },
+    {
+      "name": "校友会",
+      "host": "xyw.bit.edu.cn",
+      "root_url": "https://xyw.bit.edu.cn/",
+      "category": "校友",
+      "verified": false,
+      "crawl_enabled": true
+    },
+    {
+      "name": "基金会",
+      "host": "ef.bit.edu.cn",
+      "root_url": "https://ef.bit.edu.cn/",
+      "category": "公益合作",
+      "verified": false,
+      "crawl_enabled": true
+    },
+    {
+      "name": "人事处",
+      "host": "renshichu.bit.edu.cn",
+      "root_url": "https://renshichu.bit.edu.cn/",
+      "category": "招聘人事",
+      "verified": false,
+      "crawl_enabled": true
+    }
+  ],
+  "restricted_sites": [
+    {
+      "name": "智慧北理",
+      "host": "ehall.bit.edu.cn",
+      "root_url": "https://ehall.bit.edu.cn/",
+      "reason": "统一身份认证登录后才能访问业务内容"
+    },
+    {
+      "name": "统一认证",
+      "host": "sso.bit.edu.cn",
+      "root_url": "https://sso.bit.edu.cn/",
+      "reason": "认证入口，仅适合登录跳转"
+    },
+    {
+      "name": "校园网络入口",
+      "host": "webvpn.bit.edu.cn",
+      "root_url": "https://webvpn.bit.edu.cn/",
+      "reason": "认证网关，匿名抓取价值低"
+    },
+    {
+      "name": "邮件系统",
+      "host": "mail.bit.edu.cn",
+      "root_url": "https://mail.bit.edu.cn/",
+      "reason": "邮件登录入口，不能匿名抓取邮件内容"
+    },
+    {
+      "name": "综合服务入口",
+      "host": "i.bit.edu.cn",
+      "root_url": "https://i.bit.edu.cn/",
+      "reason": "入口站点，实际业务依赖登录"
+    }
+  ]
+}

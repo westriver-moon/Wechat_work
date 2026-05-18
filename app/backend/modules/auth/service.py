@@ -1,12 +1,12 @@
 import hashlib
 import json
 import os
-from pathlib import Path
 from typing import Dict, List, Optional
 
 from flask import jsonify, redirect, request, session, url_for
 
-from db import get_auth_identity, upsert_auth_identity
+from modules.shared.db import get_auth_identity, upsert_auth_identity
+from modules.shared.paths import BACKEND_ROOT
 
 try:
     import bit_login
@@ -25,13 +25,15 @@ PERMISSION_NAME_MAP = {
 }
 
 SESSION_KEY = "auth_user"
-ALLOWLIST_PATH = Path(__file__).resolve().parent / "auth_identities.json"
-OWNER_SALT = os.getenv("AUTH_OWNER_SALT", os.getenv("SECRET_KEY", "dev-secret-key"))
-SESSION_HOURS = max(1, int(os.getenv("AUTH_SESSION_HOURS", "8")))
+ALLOWLIST_PATH = BACKEND_ROOT / "auth_identities.json"
 
 
 class AuthError(Exception):
     pass
+
+
+def owner_salt() -> str:
+    return os.getenv("AUTH_OWNER_SALT", os.getenv("SECRET_KEY", "dev-secret-key"))
 
 
 def _permissions_from_value(raw_value) -> int:
@@ -54,12 +56,12 @@ def permission_labels(bits: int) -> List[str]:
 
 
 def build_owner_identity(student_code: str) -> str:
-    digest = hashlib.sha256(f"{OWNER_SALT}:{student_code}".encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(f"{owner_salt()}:{student_code}".encode("utf-8")).hexdigest()
     return f"user:{digest}"
 
 
 def build_external_identity(channel: str, external_id: str) -> str:
-    digest = hashlib.sha256(f"{OWNER_SALT}:{channel}:{external_id}".encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(f"{owner_salt()}:{channel}:{external_id}".encode("utf-8")).hexdigest()
     return f"{channel}:{digest}"
 
 
